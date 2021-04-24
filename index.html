@@ -78,27 +78,106 @@
 
     const requestData1 = async function () {
 
+      ///////////////////////////////////////////////// 
+      // 1. Draw a map of all countries using topoJSON
+      /////////////////////////////////////////////////
+
+      // Import topoJSON data file
       const world = await d3.json("countries-110m.json");
 
+      // Pick out topographic features and build d3 helpers
       var countries = topojson.feature(world, world.objects.countries);
       var countriesMesh = topojson.mesh(world, world.objects.countries);
       var projection = d3.geoMercator() //geoNaturalEarth1
       var path = d3.geoPath().projection(projection);
 
-      var graticule = d3.geoGraticule10();
+      var graticule = d3.geoGraticule10();       // Add a graticule
       map.append("path").attr("class", "graticule").attr("d", path(graticule));
 
-      // 1. Draw nation and state outlines
-      map.selectAll("path.country").data(countries.features)
+      // Draw countries and outlines
+      map.selectAll("path.country").data(countries.features)  // countries
         .join("path")
         .attr("class", "country")
         .attr("id", d => d.id)
         // .on("click", clicked)
         .attr("d", path);
 
-      map.append("path").datum(countriesMesh)
+      map.append("path").datum(countriesMesh) // outlines
         .attr("class", "outline")
         .attr("d", path);
+
+      /////////////////////////////////////////////////
+      // 2. Import temperature data
+      /////////////////////////////////////////////////
+      var tempData = await d3.csv("Temperatures.csv");
+
+      tempData = tempData.filter(d => d['AverageTemperature'] !== ""); // filter out blank data
+      // console.log(tempData)
+      tempData.sort((x, y) => {
+        return d3.ascending(x.Country, y.Country);
+      })
+      console.log(tempData)
+      var all_countries = [];
+      var data = [];
+      tempData.forEach((d, i) => {
+        // get all countries in this data
+        if (d.Country != all_countries[0]) {
+          all_countries.splice(0, 0, d.Country);
+        }
+        // get the data of all countreis on 2000-7-1
+        if (d.dt === "2000-07-01") {
+          data.push(d);
+        }
+      })
+      console.log(data)
+      console.log(all_countries.sort())
+      // var ctMap = {};
+      // all_countries.forEach((d, i) => {
+      //   ctMap[i] = d;
+      // })
+      // console.log(ctMap)
+      // console.log(countries.features)
+
+      // Generate the data we will use
+      let countryCounts = {}; // countryCounts[ countryName ] -> count
+      let cnt = [];
+      let idToCountry = {}  // idToCountry[ countryID ] -> CountryName
+
+
+      countries.features.forEach(row => {
+        cnt.push({ id: row.id, name: row.properties.name })
+        countryCounts[row.properties.name] = 0;
+        idToCountry[row.id] = row.properties.name;
+      });
+
+      cnt.forEach(row => {
+        data.forEach(d => {
+          if (d.Country == row.name) {
+            row.temperature = d.AverageTemperature;
+          }
+        })
+      })
+
+      cnt = cnt.filter(d => d['temperature']);
+      console.log(cnt)
+
+
+      data.forEach( row=> {
+        countryCounts[row.Country] = row.AverageTemperature;
+      })
+
+      // console.log(countryCounts)
+      // console.log(idToCountry)
+
+
+
+
+
+
+
+
+
+
 
       // 2. Add tooltips to show the name of the country
       let tooltipWidth = 120;
@@ -138,7 +217,7 @@
         let country = d3.select(this);
         let ctID = country.datum().id;
         let ctName = country.datum().properties.name;
-        console.log(country.datum().properties.name)
+        // console.log(country.datum().properties.name)
         //  First, make a new mesh with a filter for only borders of the current state
         var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === ctID || b.id === ctID; });
         //  Then apply it to your special mesh that's on top of everything else
@@ -149,7 +228,7 @@
         // Place it at the bottom of the state, centered
         let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
         let yPos = bounds[1][1];
-        console.log(xPos, yPos)
+        // console.log(xPos, yPos)
 
         // Transform the <g> group so that everything moves together easily
         tooltip.attr("transform", `translate(${xPos},${yPos})`);
@@ -232,25 +311,7 @@
       d3.select('#reset').on('click', reset);
 
 
-      // 4. Import data
-      var tempData = await d3.csv("Temperature.csv");
-      tempData = tempData.filter(d => d['AverageTemperature'] !== "");
-      // console.log(tempData)
-      tempData.sort((x, y) => {
-        return d3.ascending(x.Country, y.Country);
-      })
-      console.log(tempData)
-      var countries = [];
-      tempData.forEach((d, i) => {
-        if (d.Country != countries[0]) {
-          countries.splice(0, 0, d.Country);
-        }
-      })
-      var ctMap = {};
-      countries.forEach((d, i) => {
-        ctMap[i] = d;
-      })
-      // console.log(ctMap)
+
 
 
 
