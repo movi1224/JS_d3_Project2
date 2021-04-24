@@ -1,0 +1,257 @@
+<html>
+
+<head>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="https://d3js.org/topojson.v3.min.js"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+  <style>
+    .land {
+      fill: gray;
+    }
+
+    .outline {
+      stroke: #fff;
+      stroke-width: 1px;
+      fill: none;
+    }
+
+    .graticule {
+      stroke: #ddd;
+      stroke-width: 1px;
+      fill: none;
+    }
+
+    #float-button-group {
+      position: fixed;
+      left: 10;
+      opacity: 0.5;
+    }
+
+    #float-button-group:hover {
+      opacity: 1;
+    }
+
+    #map {
+      background: skyblue;
+      border: 3px solid steelblue;
+    }
+
+    #map-zoomer {
+      position: absolute;
+      writing-mode: bt-lr;
+      -webkit-appearance: slider-vertical;
+      width: 8px;
+      height: 100px;
+      padding: 0 5px;
+      position: absolute;
+      top: 125px;
+      left: 25px;
+    }
+  </style>
+</head>
+
+<body>
+  <p>Project2</p>
+  <div id="map">
+    <div class="btn-group-vertical" role="group"  id="float-button-group">
+      <button type="button" class="btn btn-default" id="in"><span class="glyphicon glyphicon-zoom-in"
+          aria-hidden="true"></span></button>
+      <button type="button" class="btn btn-default" id="out"><span class="glyphicon glyphicon-zoom-out"
+          aria-hidden="true"></span></button>
+      <button type="button" class="btn btn-default" id="reset"><span class="glyphicon glyphicon-screenshot"
+          aria-hidden="true"></span></button>
+    </div>
+    <input type="range" value="1" min="1" max="8" orient="vertical" id="map-zoomer"/>
+
+    <svg id="worldmap" height="610" width="960" style="background: white"></svg>
+  </div>
+  <script>
+    // Fast food map
+    const svg = d3.select("#worldmap");
+    const width = svg.attr("width");
+    const height = svg.attr("height");
+    const mapWidth = width;
+    const mapHeight = height;
+    // No margins here since our US map already has a specific projection to match to size
+    const map = svg.append("g");
+
+    const requestData1 = async function () {
+
+      // We'll use the same map and projection as in the 03-26 notes
+      const world = await d3.json("countries-110m.json");
+      var projection = d3.geoMercator() //geoNaturalEarth1
+
+      var path = d3.geoPath().projection(projection);
+
+      var land = topojson.feature(world, world.objects.countries);
+      var countriesMesh = topojson.mesh(world, world.objects.countries);
+      var graticule = d3.geoGraticule10();
+      map.append("path").attr("class", "graticule").attr("d", path(graticule));
+
+      // Draw nation and state outlines
+      var contries = map.selectAll("path.land").data(land.features)
+        .join("path")
+        .attr("class", "land")
+        // .on("click", clicked)
+        .attr("d", path);
+
+      map.append("path").datum(countriesMesh)
+        .attr("class", "outline")
+        .attr("d", path);
+
+      // zoom features
+      const zoom = d3.zoom()
+        .scaleExtent([1, 5])
+        .on("zoom", zoomed);
+
+      svg.call(zoom);
+
+      function zoomed(event) {
+        const { transform } = event;
+        map.attr("transform", transform);
+        slider.property("value", transform.k);
+        console.log(transform)
+      }
+
+      // function clicked(event, d) {
+      //   const [[x0, y0], [x1, y1]] = path.bounds(d);
+      //   event.stopPropagation();
+      //   contries.transition().style("fill", null);
+      //   d3.select(this).transition().style("fill", "red");
+      //   svg.transition().duration(750).call(
+      //     zoom.transform,
+      //     d3.zoomIdentity
+      //       .translate(mapWidth / 2, mapHeight / 2)
+      //       .scale(Math.min(8, 0.9 / Math.max((x1 - x0) / mapWidth, (y1 - y0) / mapHeight)))
+      //       .translate(-(x0 + x1) / 2, -(y0 + y1) / 2),
+      //     d3.pointer(event, svg.node())
+      //   );
+      // }
+
+      function reset() {
+        svg.transition().duration(750).call(
+          zoom.transform,
+          d3.zoomIdentity,
+          d3.zoomTransform(svg.node()).invert([mapWidth / 2, mapHeight / 2])
+        );
+        console.log('identity',d3.zoomIdentity)
+      }
+
+      var slider = d3.select("#map-zoomer")
+        .datum({})
+        .attr("type", "range")
+        .attr("value", zoom.scaleExtent()[0])
+        .attr("min", zoom.scaleExtent()[0])
+        .attr("max", zoom.scaleExtent()[1])
+        .attr("step", (zoom.scaleExtent()[1] - zoom.scaleExtent()[0]) / 100)
+        .on("input", slided);
+
+      function slided(d) {
+        zoom.scaleTo(map, d3.select(this).property("value"));
+        
+      }
+
+      d3.select('#in').on('click', () => {
+        svg.transition().call(zoom.scaleBy, 1.2)
+        console.log()
+      });
+
+      d3.select('#out').on('click', () => {
+        svg.transition().call(zoom.scaleBy, 0.8)
+      });
+
+      d3.select('#reset').on('click', reset);
+
+
+
+
+
+
+
+      // No counties this time
+
+
+      // // Now import our fastfood dataset
+      // var fastfood = await d3.csv("fastfood.csv", d3.autoType);
+      // // console.log(fastfood)
+
+      // // We're going to draw contours today. For contours, working by PIXEL
+      // // coords rather than lat/lng is going to be the best approach 
+      // // We do the same conversion as we did in the dot chart...
+      // fastfood.forEach( (d, i) => {
+      //   // Use the projection just like a scale to convert from lng/lat to pixels
+      //   d.position = projection( [d.longitude, d.latitude] );
+      //   // console.log(d.position)
+      // });
+
+
+
+      // // ** Make a contour generator **
+      // // You'll see two kinds in the documentation, d3.contour() and d3.contourDensity
+      // // -Use d3.contour when you have *values* spread across space and want to show them
+      // // -Use contourDensity when you have *points* spread over space and want to show
+      // //   *how many* there are in a given location compared to other locations
+      // // Like other shape generators, you're programming a function that takes in a
+      // //  dataset and does something fancy to it to generate shapes
+      // let contourGen = d3.contourDensity()
+      //                    .x( d => d.position[0] )        // point x position (best in pixels)
+      //                    .y( d => d.position[1] )        // point y position (best in pixels)
+      //                    .size( [width, height] )    // size of canvas
+      //                    .thresholds( 10 );              // number of "levels" you want
+
+      // // Now run the contour generator on your dataset
+      // let contours = contourGen(fastfood);
+
+      // // Check out what kind of data you get...
+      // console.log(contours)
+      // // It's actually a topoJSON featureCollection!
+      // // A contour generator creates fake geographic data to use to draw contours
+      // // We know how to work with these kinds of things...
+
+      // // Let's make a color scale for the density contours
+      // // Our topoJSON has an extra key for each feature, value, that is the density
+      // //  value for that particular contour in the list -- we can use extent to figure
+      // //  out the min and max density levels so we can apply a color scale
+      // let valueExtent = d3.extent(contours, d => d.value);
+      // let colorScale = d3.scaleSequential(d3.interpolateViridis).domain(valueExtent)
+
+      // let layer = map.append("g");
+
+      // // Sidenote: The array of features that contourDensity gives you have been carefully
+      // //  ordered so that the big, low density ones will be earlier in the list -- this
+      // //  guarantees that they'll be drawn *underneath* the higher densities in a join
+      // layer.selectAll("path.contours")
+      //       .data(contours)
+      //       .join("path")
+      //       .attr("class", 'contours')
+      //       .attr("fill", d => colorScale(d.value) )
+      //       .attr("d", d3.geoPath())  
+      //         // NOTE: We create a new d3.geoPath because we have already converted our 
+      //         //  locations into pixels. We don't need a projection in our geoPath now
+
+      // // But how do we make sure the user can still see the map details and state borders?
+      // // layer.attr("opacity", 0.5)   // This doesn't work too well to show map details...
+
+      // // Better is to layer some stuff on top of the contours!
+      // map.append("path").datum(countriesMesh)
+      //       .attr("class","outline")
+      //       .attr("opacity", 0.5)
+      //       .attr("d", path);
+
+      // // // We can show the circles to see whether our densities are plausible
+      // // ffmap.selectAll("circle.dot").data(fastfood)
+      // //      .join("circle")
+      // //      .attr("class","dot")
+      // //      .attr("r", 2)
+      // //      .attr("fill", "darkgrey")
+      // //      .attr("opacity", 0.2)
+      // //      .attr("cx", d => d.position[0])
+      // //      .attr("cy", d => d.position[1]);
+
+
+    }
+    requestData1();
+  </script>
+</body>
+
+</html>
