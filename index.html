@@ -5,7 +5,7 @@
   <script src="https://d3js.org/topojson.v3.min.js"></script>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
   <style>
-    .land {
+    .country {
       fill: gray;
     }
 
@@ -13,6 +13,11 @@
       stroke: #fff;
       stroke-width: 1px;
       fill: none;
+    }
+
+    .mouseover {
+      stroke-width: 3px;
+      pointer-events: none;
     }
 
     .graticule {
@@ -29,11 +34,6 @@
 
     #float-button-group:hover {
       opacity: 1;
-    }
-
-    #map {
-      background: skyblue;
-      border: 3px solid steelblue;
     }
 
     #map-zoomer {
@@ -53,7 +53,7 @@
 <body>
   <p>Project2</p>
   <div id="map">
-    <div class="btn-group-vertical" role="group"  id="float-button-group">
+    <div class="btn-group-vertical" role="group" id="float-button-group">
       <button type="button" class="btn btn-default" id="in"><span class="glyphicon glyphicon-zoom-in"
           aria-hidden="true"></span></button>
       <button type="button" class="btn btn-default" id="out"><span class="glyphicon glyphicon-zoom-out"
@@ -61,10 +61,11 @@
       <button type="button" class="btn btn-default" id="reset"><span class="glyphicon glyphicon-screenshot"
           aria-hidden="true"></span></button>
     </div>
-    <input type="range" value="1" min="1" max="8" orient="vertical" id="map-zoomer"/>
+    <input type="range" value="1" min="1" max="8" orient="vertical" id="map-zoomer" />
 
-    <svg id="worldmap" height="610" width="960" style="background: white"></svg>
   </div>
+  <svg id="worldmap" height="610" width="960"></svg>
+
   <script>
     // Fast food map
     const svg = d3.select("#worldmap");
@@ -77,21 +78,21 @@
 
     const requestData1 = async function () {
 
-      // We'll use the same map and projection as in the 03-26 notes
       const world = await d3.json("countries-110m.json");
-      var projection = d3.geoMercator() //geoNaturalEarth1
 
+      var countries = topojson.feature(world, world.objects.countries);
+      var countriesMesh = topojson.mesh(world, world.objects.countries);
+      var projection = d3.geoMercator() //geoNaturalEarth1
       var path = d3.geoPath().projection(projection);
 
-      var land = topojson.feature(world, world.objects.countries);
-      var countriesMesh = topojson.mesh(world, world.objects.countries);
       var graticule = d3.geoGraticule10();
       map.append("path").attr("class", "graticule").attr("d", path(graticule));
 
-      // Draw nation and state outlines
-      var contries = map.selectAll("path.land").data(land.features)
+      // 1. Draw nation and state outlines
+      map.selectAll("path.country").data(countries.features)
         .join("path")
-        .attr("class", "land")
+        .attr("class", "country")
+        .attr("id", d => d.id)
         // .on("click", clicked)
         .attr("d", path);
 
@@ -99,8 +100,76 @@
         .attr("class", "outline")
         .attr("d", path);
 
-      // zoom features
-      const zoom = d3.zoom()
+      // 2. Add tooltips to show the name of the country
+      let tooltipWidth = 120;
+      let tooltipHeight = 40;
+
+      let tooltip = map.append("g")
+        .attr("class", "tooltip")
+        .attr("visibility", "hidden");
+
+      tooltip.append("rect")
+        .attr("fill", "black")
+        .attr("opacity", 0.9)
+        .attr("x", -tooltipWidth / 2.0)
+        .attr("y", 0)
+        .attr("width", tooltipWidth)
+        .attr("height", tooltipHeight);
+
+      let txt = tooltip.append("text")
+        .attr("fill", "white")
+        .attr("text-anchor", "middle")
+        .attr("alignment-baseline", "hanging")
+        .attr("x", 0)
+        .attr("y", 2);
+
+      // mouseover outline
+      let momesh = map.append("path")
+        .attr("class", "mouseover outline")
+        .attr("d", "");
+
+        d3.selectAll(".country").on("mouseenter", mouseEnters) // mouseover to show tooltips
+        d3.selectAll(".country").on("mouseout", mouseLeaves)
+
+      function mouseEnters() {
+        // Make tooltip visible
+        tooltip.style("visibility", "visible")
+        // Find the state SVG element and add stroke
+        let country = d3.select(this);
+        let ctID = country.datum().id;
+        let ctName = country.datum().properties.name;
+        console.log(country.datum().properties.name)
+        //  First, make a new mesh with a filter for only borders of the current state
+        var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === ctID || b.id === ctID; });
+        //  Then apply it to your special mesh that's on top of everything else
+        momesh.datum(mo).attr("d", path)
+        txt.text("ctName");
+
+        let bounds = path.bounds(country.datum());   // Get the pixel boundaries of the state
+        // Place it at the bottom of the state, centered
+        let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
+        let yPos = bounds[1][1];
+        console.log(xPos, yPos)
+
+        // Transform the <g> group so that everything moves together easily
+        tooltip.attr("transform", `translate(${xPos},${yPos})`);
+      }
+
+      function mouseLeaves() {
+        // Hide when you leave a state
+        tooltip.style("visibility", "hidden");
+        let country = d3.select(this);
+        // Reset old style mouseover stroke
+        // state.attr("stroke","none")
+        //      .attr("stroke-width", 0);
+        // }
+        // Here we are hiding the mouseover mesh we added at the end of the lecture
+        momesh.attr("d", "");
+
+      }
+
+      // 3. Zoom-in & zoom-out features with the slider
+      const zoom = d3.zoom() // initiate d3-zoom
         .scaleExtent([1, 5])
         .on("zoom", zoomed);
 
@@ -110,7 +179,7 @@
         const { transform } = event;
         map.attr("transform", transform);
         slider.property("value", transform.k);
-        console.log(transform)
+        // console.log(transform)
       }
 
       // function clicked(event, d) {
@@ -128,15 +197,17 @@
       //   );
       // }
 
+      // reset to original scale
       function reset() {
         svg.transition().duration(750).call(
           zoom.transform,
           d3.zoomIdentity,
           d3.zoomTransform(svg.node()).invert([mapWidth / 2, mapHeight / 2])
         );
-        console.log('identity',d3.zoomIdentity)
+        // console.log('identity',d3.zoomIdentity)
       }
 
+      // create a slider that zoom-in and zoom-out the map
       var slider = d3.select("#map-zoomer")
         .datum({})
         .attr("type", "range")
@@ -148,12 +219,11 @@
 
       function slided(d) {
         zoom.scaleTo(map, d3.select(this).property("value"));
-        
+
       }
 
       d3.select('#in').on('click', () => {
         svg.transition().call(zoom.scaleBy, 1.2)
-        console.log()
       });
 
       d3.select('#out').on('click', () => {
@@ -163,8 +233,25 @@
       d3.select('#reset').on('click', reset);
 
 
-
-
+      // 4. Import data
+      var tempData = await d3.csv("Temperature.csv");
+      tempData = tempData.filter(d => d['AverageTemperature'] !== "");
+      // console.log(tempData)
+      tempData.sort((x, y) => {
+        return d3.ascending(x.Country, y.Country);
+      })
+      console.log(tempData)
+      var countries = [];
+      tempData.forEach((d, i) => {
+        if (d.Country != countries[0]) {
+          countries.splice(0, 0, d.Country);
+        }
+      })
+      var ctMap = {};
+      countries.forEach((d, i) => {
+        ctMap[i] = d;
+      })
+      // console.log(ctMap)
 
 
 
