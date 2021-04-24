@@ -128,8 +128,8 @@
         .attr("class", "mouseover outline")
         .attr("d", "");
 
-        d3.selectAll(".country").on("mouseenter", mouseEnters) // mouseover to show tooltips
-        d3.selectAll(".country").on("mouseout", mouseLeaves)
+      d3.selectAll(".country").on("mouseenter", mouseEnters) // mouseover to show tooltips
+      d3.selectAll(".country").on("mouseout", mouseLeaves)
 
       function mouseEnters() {
         // Make tooltip visible
@@ -218,8 +218,7 @@
         .on("input", slided);
 
       function slided(d) {
-        zoom.scaleTo(map, d3.select(this).property("value"));
-
+        svg.transition().call(zoom.scaleTo, d3.select(this).property("value"));
       }
 
       d3.select('#in').on('click', () => {
