@@ -26,6 +26,17 @@
       fill: none;
     }
 
+    #map {
+      float: left;
+      display: inline;
+    }
+
+    #legend {
+      /* margin-left: 10px; */
+      float: left;
+      display: inline;
+    }
+
     #float-button-group {
       position: fixed;
       left: 10;
@@ -86,7 +97,6 @@
 </head>
 
 <body>
-  <div class="container larger">
   <p>Project2</p>
 
   <div id="slider"></div>
@@ -100,11 +110,12 @@
           aria-hidden="true"></span></button>
     </div>
     <input type="range" value="1" min="1" max="8" orient="vertical" id="map-zoomer" />
-
+    <svg id="worldmap" height="610" width="960"></svg>
   </div>
-  <svg id="worldmap" height="610" width="960"></svg>
 
-  <svg id="colorLegend" height="100" width="600" style="background: #fff; margin-top:30px"></svg>
+  <div id="legend">
+    <svg id="colorLegend" height="600" width="200" style="background: #fff;"></svg>
+  </div>
 
   <script>
     // Fast food map
@@ -204,13 +215,6 @@
           }
           country_avgTemp[key] = total / temperature_list.length;
       });
-
-      // var ctMap = {};
-      // all_countries.forEach((d, i) => {
-      //   ctMap[i] = d;
-      // })
-      // console.log(ctMap)
-      // console.log(countries.features)
 
       // Generate the data we will use
       var countryCounts = {}; // countryCounts[ countryName ] -> count
@@ -647,20 +651,15 @@
   </script>
 
   <script>
-
-
     // Function needs a d3 selected SVG canvas where it will draw the legend and a source color scale
     function drawLegend(legend, legendColorScale) {
-
-
-      // Bonus code here to draw an adaptive gradient legend so we can see different color scales for choropleth maps
-      //  Credit Prof. Rz if you are basing a legend on this structure, and note SERIOUS PERFORMANCE CONSIDERATIONS
-
       //const legend = d3.select("#colorLegend");
-      const legendWidth = legend.attr("width");
-      const legendHeight = legend.attr("height");
-      const legendMinMax = d3.extent(legendColorScale.domain()); // way to recover the minMax from most kinds of scales
-      const barHeight = 60;
+      // invert the height and width becasue we need a rotated legend
+      const legendWidth = legend.attr("height");
+      const legendHeight = legend.attr("width");
+      let legendMinMax = d3.extent(legendColorScale.domain()); // way to recover the minMax from most kinds of scales
+      console.log(legendMinMax)
+      const barHeight = 20;
       const stepSize = 4; // warning, not using a canvas element so lots of rect tags will be created for low stepSize, causing issues with performance
       // Extend the minmax by 1 in either direction to expose more features
       const pixelScale = d3.scaleLinear().domain([0, legendWidth - 40]).range([legendMinMax[0] - 1, legendMinMax[1] + 1]); // In this case the "data" are pixels, and we get numbers to use in colorScale
@@ -673,10 +672,11 @@
       }
       legend.append("g")
         .attr("class", "colorbar axis")
-        .attr("transform", "translate(" + (20) + "," + (barHeight + 5) + ")")
+        .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" +  "translate(" + (-10) + "," + (-470) + ")")
         .call(barAxis);
       // Draw rects of color down the bar
-      let bar = legend.append("g").attr("transform", "translate(" + (20) + "," + (0) + ")")
+      let bar = legend.append("g")
+        .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" +  "translate(" + (-10) + "," + (-500) + ")")
       for (let i = 0; i < legendWidth - 40; i = i + stepSize) {
         bar.append("rect")
           .attr("x", i)
@@ -692,7 +692,6 @@
     }
 
   </script>
-  </div>
 </body>
 
 </html>
