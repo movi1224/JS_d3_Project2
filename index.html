@@ -44,14 +44,52 @@
       height: 100px;
       padding: 0 5px;
       position: absolute;
-      top: 125px;
+      top: 205px;
       left: 25px;
+    }
+
+    .ticks {
+      font-size: 10px;
+    }
+
+    .track
+    .track-inset,
+    .track-overlay {
+      stroke-linecap: round;
+    }
+
+    .track {
+      stroke: #000;
+      stroke-opacity: 0.3;
+      stroke-width: 10px;
+    }
+
+    .track-inset {
+      stroke: #dcdcdc;
+      stroke-width: 8px;
+    }
+
+    .track-overlay {
+      pointer-events: stroke;
+      stroke-width: 50px;
+      stroke: transparent;
+      cursor: crosshair;
+    }
+
+    .handle {
+      fill: #fff;
+      stroke: #000;
+      stroke-opacity: 0.5;
+      stroke-width: 1.25px;
     }
   </style>
 </head>
 
 <body>
+  <div class="container larger">
   <p>Project2</p>
+
+  <div id="slider"></div>
   <div id="map">
     <div class="btn-group-vertical" role="group" id="float-button-group">
       <button type="button" class="btn btn-default" id="in"><span class="glyphicon glyphicon-zoom-in"
@@ -65,6 +103,7 @@
 
   </div>
   <svg id="worldmap" height="610" width="960"></svg>
+
   <svg id="colorLegend" height="100" width="600" style="background: #fff; margin-top:30px"></svg>
 
   <script>
@@ -117,21 +156,55 @@
       tempData.sort((x, y) => {
         return d3.ascending(x.Country, y.Country);
       })
-      console.log(tempData)
+
       var all_countries = [];
-      var data = [];
-      tempData.forEach((d, i) => {
-        // get all countries in this data
-        if (d.Country != all_countries[0]) {
-          all_countries.splice(0, 0, d.Country);
-        }
-        // get the data of all countreis on 2000-7-1
-        if (d.dt === "2000-07-01") {
-          data.push(d);
-        }
-      })
-      console.log(data)
-      console.log(all_countries.sort())
+      var country_avgTemp = {};
+      var formatDateIntoYear = d3.timeFormat("%Y");
+      var formatDate = d3.timeFormat("%b %Y");
+      var parseDate = d3.timeParse("%m/%d/%y");
+      const DEFAULT_DATE = formatDateIntoYear(new Date("1980-02-01"));
+      // var  = formatDateIntoYear("1980-07-01");
+      // tempData.forEach((d, i) => {
+      //   // get all countries in this data
+      //   if (d.Country != all_countries[0]) {
+      //     all_countries.splice(0, 0, d.Country);
+      //   }
+
+      //   if (d.dt >= DEFAULT_DATE && d.dt < DEFAULT_DATE+2) {
+      //     data.push(d);
+      //   }
+      // })
+
+      filteredData = tempData.filter(function(d) {
+          return d.dt >= DEFAULT_DATE && d.dt < DEFAULT_DATE+1;
+        })
+        // let filterFunc = d => d["dt"] <= data;
+        // tempData = tempData.filter( d => pointPassesFilters(d) ); 
+        filteredData.forEach((d, i) => {
+          var country  = d.Country;
+          if (country != all_countries[0]) {
+            all_countries.splice(0, 0, country);
+          }
+          if (!(country in country_avgTemp)){
+            var temperature_list = [];
+            temperature_list.push(d.AverageTemperature);
+            country_avgTemp[country] = temperature_list;
+          }else{
+            temperature_list = country_avgTemp[country];
+            temperature_list.push(d.AverageTemperature);
+            country_avgTemp[country] = temperature_list;
+          }
+        });
+
+      Object.keys(country_avgTemp).forEach(function(key) {
+          temperature_list = country_avgTemp[key];
+          var total = 0;
+          for (i = 0; i < temperature_list.length; i++) {
+            total += Number(temperature_list[i]);
+          }
+          country_avgTemp[key] = total / temperature_list.length;
+      });
+
       // var ctMap = {};
       // all_countries.forEach((d, i) => {
       //   ctMap[i] = d;
@@ -140,10 +213,9 @@
       // console.log(countries.features)
 
       // Generate the data we will use
-      let countryCounts = {}; // countryCounts[ countryName ] -> count
-      let cnt = [];
-      let idToCountry = {}  // idToCountry[ countryID ] -> CountryName
-
+      var countryCounts = {}; // countryCounts[ countryName ] -> count
+      var cnt = [];
+      var idToCountry = {}  // idToCountry[ countryID ] -> CountryName
 
       countries.features.forEach(row => {
         cnt.push({ id: row.id, name: row.properties.name })
@@ -152,28 +224,24 @@
       });
 
       cnt.forEach(row => {
-        data.forEach(d => {
-          if (d.Country == row.name) {
-            row.temperature = d.AverageTemperature;
-          }
-        })
-        row.temperature = Number(row.temperature)
+          Object.keys(country_avgTemp).forEach(function(key) {
+            if (key === row.name) {
+              row.temperature = country_avgTemp[key];
+            }
+          })
+          row.temperature = Number(row.temperature)
       })
 
       cnt = cnt.filter(d => d['temperature'] && d['id']);
-      console.log(cnt)
 
 
       cnt.forEach(row => {
         countryCounts[row.name] = row.temperature;
       })
 
-      console.log(countryCounts)
-      // console.log(idToCountry)
 
       // Make a d3 color scale for frequency    
       const minMax = d3.extent(cnt, d => countryCounts[d.name]);
-      console.log(minMax);
 
       var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
@@ -191,81 +259,165 @@
 
 
 
+      function updateTemparature(data) {
+
+        handle.attr("cx", x(data));
+
+
+        data = formatDateIntoYear(data);
+
+        label.attr("x", x(data)).text(data);
+      
+
+
+        var all_countries = [];
+        var country_avgTemp = {};
+        filteredData = tempData.filter(function(d) {
+          return d.dt >= data && d.dt < data+1;
+        })
+        // let filterFunc = d => d["dt"] <= data;
+        // tempData = tempData.filter( d => pointPassesFilters(d) ); 
+        filteredData.forEach((d, i) => {
+          var country  = d.Country;
+          if (country != all_countries[0]) {
+            all_countries.splice(0, 0, country);
+          }
+          if (!(country in country_avgTemp)){
+            var temperature_list = [];
+            temperature_list.push(d.AverageTemperature);
+            country_avgTemp[country] = temperature_list;
+          }else{
+            temperature_list = country_avgTemp[country];
+            temperature_list.push(d.AverageTemperature);
+            country_avgTemp[country] = temperature_list;
+          }
+        });
 
 
 
 
 
-      /////////////////////////////////////////////////
-      // 3. Add tooltips to show the name of the country
-      /////////////////////////////////////////////////
 
-      let tooltipWidth = 120;
-      let tooltipHeight = 40;
+        Object.keys(country_avgTemp).forEach(function(key) {
+          temperature_list = country_avgTemp[key];
+          var total = 0;
+          for (i = 0; i < temperature_list.length; i++) {
+            total += Number(temperature_list[i]);
+          }
+          country_avgTemp[key] = total / temperature_list.length;
+        });
 
-      let tooltip = map.append("g")
-        .attr("class", "tooltip")
-        .attr("visibility", "hidden");
 
-      tooltip.append("rect")
-        .attr("fill", "black")
-        .attr("opacity", 0.9)
-        .attr("x", -tooltipWidth / 2.0)
-        .attr("y", 0)
-        .attr("width", tooltipWidth)
-        .attr("height", tooltipHeight);
 
-      let txt = tooltip.append("text")
-        .attr("fill", "white")
-        .attr("text-anchor", "middle")
-        .attr("alignment-baseline", "hanging")
-        .attr("x", 0)
-        .attr("y", 2);
 
-      // mouseover outline
-      let momesh = map.append("path")
-        .attr("class", "mouseover outline")
-        .attr("d", "");
+        var countryCounts = {}; // countryCounts[ countryName ] -> count
+        var cnt = [];
+        var idToCountry = {}  // idToCountry[ countryID ] -> CountryName
 
-      d3.selectAll(".country").on("mouseenter", mouseEnters) // mouseover to show tooltips
-      d3.selectAll(".country").on("mouseout", mouseLeaves)
 
-      function mouseEnters() {
-        // Make tooltip visible
-        tooltip.style("visibility", "visible")
-        // Find the state SVG element and add stroke
-        let country = d3.select(this);
-        let ctID = country.datum().id;
-        let ctName = country.datum().properties.name;
-        // console.log(country.datum().properties.name)
-        //  First, make a new mesh with a filter for only borders of the current state
-        var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === ctID || b.id === ctID; });
-        //  Then apply it to your special mesh that's on top of everything else
-        momesh.datum(mo).attr("d", path)
-        txt.text("ctName");
+        countries.features.forEach(row => {
+          cnt.push({ id: row.id, name: row.properties.name })
+          countryCounts[row.properties.name] = 0;
+          idToCountry[row.id] = row.properties.name;
+        });
 
-        let bounds = path.bounds(country.datum());   // Get the pixel boundaries of the state
-        // Place it at the bottom of the state, centered
-        let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
-        let yPos = bounds[1][1];
-        // console.log(xPos, yPos)
+        cnt.forEach(row => {
+          Object.keys(country_avgTemp).forEach(function(key) {
+            if (key === row.name) {
+              row.temperature = country_avgTemp[key];
+            }
+          })
+          row.temperature = Number(row.temperature)
+        })
+        
+        cnt = cnt.filter(d => d['temperature'] && d['id']);
 
-        // Transform the <g> group so that everything moves together easily
-        tooltip.attr("transform", `translate(${xPos},${yPos})`);
+
+        cnt.forEach(row => {
+          countryCounts[row.name] = row.temperature;
+        })
+
+
+
+        // Make a d3 color scale for frequency    
+        const minMax = d3.extent(cnt, d => countryCounts[d.name]);
+
+        var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
+
+        const colorScale = d3.scaleQuantize()
+          .domain(minMax)
+          .range(colors);
+
+        // Recolor the states to make a choropleth map
+        map.selectAll(".country")
+          .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
+
+        // Use the extra legend code to draw a legend
+      
       }
 
-      function mouseLeaves() {
-        // Hide when you leave a state
-        tooltip.style("visibility", "hidden");
-        let country = d3.select(this);
-        // Reset old style mouseover stroke
-        // state.attr("stroke","none")
-        //      .attr("stroke-width", 0);
-        // }
-        // Here we are hiding the mouseover mesh we added at the end of the lecture
-        momesh.attr("d", "");
 
-      }
+
+
+      var startDate = new Date("1980-02-01"), endDate = new Date("2012-12-01");
+
+      var svgSlider = d3.select("#slider")
+        .append("svg")
+        .attr("width", 1000)
+        .attr("height", 70);
+    
+      var x = d3.scaleTime()
+          .domain([startDate, endDate])
+          .range([0, width])
+          .clamp(true);
+
+
+      // console.log(startDate);
+
+      var slider = svgSlider.append("g")
+          .attr("class", "slider")
+          .attr("transform", "translate(" + 25 + "," + 50 / 2 + ")");;
+
+      slider.append("line")
+          .attr("class", "track")
+          .attr("x1", x.range()[0])
+          .attr("x2", x.range()[1])
+        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+          .attr("class", "track-inset")
+        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+          .attr("class", "track-overlay")
+          .call(d3.drag()
+              .on("start.interrupt", function() { slider.interrupt(); })
+              .on("start drag", function(event) { 
+                updateTemparature(x.invert(event.x)); }));
+
+      slider.insert("g", ".track-overlay")
+          .attr("class", "ticks")
+          .attr("transform", "translate(0," + 18 + ")")
+        .selectAll("text")
+          .data(x.ticks(16))
+          .enter()
+          .append("text")
+          .attr("x", x)
+          .attr("y", 10)
+          .attr("text-anchor", "middle")
+          .text(function(d) { 
+            return formatDateIntoYear(d); });
+
+      var handle = slider.insert("circle", ".track-overlay")
+          .attr("class", "handle")
+          .attr("r", 9);
+
+      var label = slider.append("text")  
+          .attr("class", "label")
+          .attr("text-anchor", "middle")
+          .text(formatDateIntoYear(startDate))
+          .attr("transform", "translate(0," + (-15) + ")");
+
+
+
+
+
 
       // 3. Zoom-in & zoom-out features with the slider
       const zoom = d3.zoom() // initiate d3-zoom
@@ -303,7 +455,6 @@
           d3.zoomIdentity,
           d3.zoomTransform(svg.node()).invert([mapWidth / 2, mapHeight / 2])
         );
-        // console.log('identity',d3.zoomIdentity)
       }
 
       // create a slider that zoom-in and zoom-out the map
@@ -329,6 +480,81 @@
       });
 
       d3.select('#reset').on('click', reset);
+
+
+      /////////////////////////////////////////////////
+      // 3. Add tooltips to show the name of the country
+      /////////////////////////////////////////////////
+
+      let tooltipWidth = 120;
+      let tooltipHeight = 40;
+
+      let tooltip = map.append("g")
+        .attr("class", "tooltip")
+        .attr("visibility", "hidden");
+
+      tooltip.append("rect")
+        .attr("fill", "black")
+        .attr("opacity", 0.9)
+        .attr("x", -tooltipWidth / 2.0)
+        .attr("y", 0)
+        .attr("width", tooltipWidth)
+        .attr("height", tooltipHeight);
+
+      let txt = tooltip.append("text")
+        .attr("fill", "white")
+        .attr("text-anchor", "middle")
+        .attr("alignment-baseline", "hanging")
+        .attr("x", 0)
+        .attr("y", 2);
+
+      // mouseover outline
+      let momesh = map.append("path")
+        .attr("class", "mouseover outline")
+        .attr("d", "");
+
+      d3.selectAll(".country").on("mouseenter", mouseEnters); // mouseover to show tooltips
+      d3.selectAll(".country").on("mouseout", mouseLeaves)
+
+      function mouseEnters() {
+        // Make tooltip visible
+        tooltip.style("visibility", "visible")
+        // Find the state SVG element and add stroke
+        let country = d3.select(this);
+        let ctID = country.datum().id;
+        let ctName = country.datum().properties.name;
+        // console.log(country.datum().properties.name)
+        //  First, make a new mesh with a filter for only borders of the current state
+        var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === ctID || b.id === ctID; });
+        //  Then apply it to your special mesh that's on top of everything else
+        momesh.datum(mo).attr("d", path)
+        txt.text(ctName);
+
+        let bounds = path.bounds(country.datum());   // Get the pixel boundaries of the state
+        // Place it at the bottom of the state, centered
+        let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
+        let yPos = bounds[1][1];
+        // console.log(xPos, yPos)
+
+        // Transform the <g> group so that everything moves together easily
+        tooltip.attr("transform", `translate(${xPos},${yPos})`);
+        tooltip.call(zoom);
+      }
+
+      function mouseLeaves() {
+        // Hide when you leave a state
+        tooltip.style("visibility", "hidden");
+        let country = d3.select(this);
+        // Reset old style mouseover stroke
+        // state.attr("stroke","none")
+        //      .attr("stroke-width", 0);
+        // }
+        // Here we are hiding the mouseover mesh we added at the end of the lecture
+        momesh.attr("d", "");
+
+      }
+
+
 
 
 
@@ -426,6 +652,7 @@
     // Function needs a d3 selected SVG canvas where it will draw the legend and a source color scale
     function drawLegend(legend, legendColorScale) {
 
+
       // Bonus code here to draw an adaptive gradient legend so we can see different color scales for choropleth maps
       //  Credit Prof. Rz if you are basing a legend on this structure, and note SERIOUS PERFORMANCE CONSIDERATIONS
 
@@ -465,6 +692,7 @@
     }
 
   </script>
+  </div>
 </body>
 
 </html>
