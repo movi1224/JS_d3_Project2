@@ -47,6 +47,16 @@
       opacity: 1;
     }
 
+    #season-button-group {
+      position: fixed;
+      left: 1200;
+      opacity: 0.5;
+    }
+
+    #season-button-group:hover {
+      opacity: 1;
+    }
+
     #map-zoomer {
       position: absolute;
       writing-mode: bt-lr;
@@ -117,6 +127,17 @@
     <svg id="colorLegend" height="600" width="200" style="background: #fff;"></svg>
   </div>
 
+  <div class="btn-group-horizontal" role="group" id="season-button-group">
+    <button type="button" class="btn btn-default" id="winter"><span
+        aria-hidden="true">Jan-Mar</span></button>
+    <button type="button" class="btn btn-default" id="spring"><span
+        aria-hidden="true">Apr-June</span></button>
+    <button type="button" class="btn btn-default" id="summer"><span 
+        aria-hidden="true">Jul-Sep</span></button>
+    <button type="button" class="btn btn-default" id="autumn"><span 
+        aria-hidden="true">Oct-Dec</span></button>
+  </div>
+
   <script>
     // Fast food map
     const svg = d3.select("#worldmap");
@@ -126,6 +147,13 @@
     const mapHeight = height;
     // No margins here since our US map already has a specific projection to match to size
     const map = svg.append("g");
+
+    var formatDateIntoYear = d3.timeFormat("%Y");
+    var formatDate = d3.timeFormat("%b %Y");
+    var parseDate = d3.timeParse("%y-%m-%d");
+    const DEFAULT_DATE = formatDateIntoYear(new Date("1980-02-01"));
+    var curYear = new Date("1980-02-01");
+
 
     const requestData1 = async function () {
 
@@ -170,10 +198,7 @@
 
       var all_countries = [];
       var country_avgTemp = {};
-      var formatDateIntoYear = d3.timeFormat("%Y");
-      var formatDate = d3.timeFormat("%b %Y");
-      var parseDate = d3.timeParse("%m/%d/%y");
-      const DEFAULT_DATE = formatDateIntoYear(new Date("1980-02-01"));
+
       // var  = formatDateIntoYear("1980-07-01");
       // tempData.forEach((d, i) => {
       //   // get all countries in this data
@@ -186,12 +211,12 @@
       //   }
       // })
 
-      filteredData = tempData.filter(function(d) {
+      curFilteredData = tempData.filter(function(d) {
           return d.dt >= DEFAULT_DATE && d.dt < DEFAULT_DATE+1;
         })
         // let filterFunc = d => d["dt"] <= data;
         // tempData = tempData.filter( d => pointPassesFilters(d) ); 
-        filteredData.forEach((d, i) => {
+        curFilteredData.forEach((d, i) => {
           var country  = d.Country;
           if (country != all_countries[0]) {
             all_countries.splice(0, 0, country);
@@ -262,26 +287,47 @@
 
 
 
+      function changeMonthDays(d, qty) {
+          var dd = d.getDate();
+          var mm = d.getMonth();
+          var yyyy = d.getFullYear();
+          return new Date(yyyy, qty, 1);
+      }
 
-      function updateTemparature(data) {
-
-        handle.attr("cx", x(data));
 
 
-        data = formatDateIntoYear(data);
+      function updateTemparature(year, startMonth = undefined, endMonth = undefined) {
 
-        label.attr("x", x(data)).text(data);
-      
+
+        handle.attr("cx", x(year));
+
+
+        if (startMonth != null){
+          startTime = changeMonthDays(year,startMonth);
+          endTime = changeMonthDays(year,endMonth);
+          console.log(startTime);
+          console.log(endTime);
+        }else{
+          year = formatDateIntoYear(year);
+          label.attr("x", x(year)).text(year);
+          console.log(year);
+        }
 
 
         var all_countries = [];
         var country_avgTemp = {};
-        filteredData = tempData.filter(function(d) {
-          return d.dt >= data && d.dt < data+1;
+        console.log(new Date(tempData[0].dt) < year);
+        curFilteredData = tempData.filter(function(d) {
+          if (startMonth!= null){
+            time = new Date(d.dt);
+            return time >= startTime && time <= endTime;
+          }
+          return d.dt >= year && d.dt < year + 1;
         })
+        console.log(curFilteredData)
         // let filterFunc = d => d["dt"] <= data;
         // tempData = tempData.filter( d => pointPassesFilters(d) ); 
-        filteredData.forEach((d, i) => {
+        curFilteredData.forEach((d, i) => {
           var country  = d.Country;
           if (country != all_countries[0]) {
             all_countries.splice(0, 0, country);
@@ -376,7 +422,9 @@
           .clamp(true);
 
 
-      // console.log(startDate);
+
+
+
 
       var slider = svgSlider.append("g")
           .attr("class", "slider")
@@ -393,7 +441,8 @@
           .call(d3.drag()
               .on("start.interrupt", function() { slider.interrupt(); })
               .on("start drag", function(event) { 
-                updateTemparature(x.invert(event.x)); }));
+                updateTemparature(year=x.invert(event.x)); 
+                curYear = x.invert(event.x)}));
 
       slider.insert("g", ".track-overlay")
           .attr("class", "ticks")
@@ -420,6 +469,30 @@
 
 
 
+      d3.select('#winter').on('click', () => {
+        updateTemparature(year = curYear, startMonth = 0, endMonth = 3);
+      });
+      
+      d3.select('#spring').on('click', () => {
+        updateTemparature(year = curYear, startMonth = 3, endMonth = 6);
+      });
+
+      d3.select('#summer').on('click', () => {
+        updateTemparature(year = curYear, startMonth = 6, endMonth = 8);
+      });
+
+      d3.select('#autumn').on('click', () => {
+        updateTemparature(year = curYear, startMonth = 8, endMonth = 11);
+      });
+
+      // d3.select('#spring').on('click', () => {
+      //   svg.transition().call(zoom.scaleBy, 0.8)
+      // });
+
+      // d3.select('#spring').on('click', reset);
+
+
+
 
 
 
@@ -434,23 +507,8 @@
         const { transform } = event;
         map.attr("transform", transform);
         slider.property("value", transform.k);
-        // console.log(transform)
       }
 
-      // function clicked(event, d) {
-      //   const [[x0, y0], [x1, y1]] = path.bounds(d);
-      //   event.stopPropagation();
-      //   contries.transition().style("fill", null);
-      //   d3.select(this).transition().style("fill", "red");
-      //   svg.transition().duration(750).call(
-      //     zoom.transform,
-      //     d3.zoomIdentity
-      //       .translate(mapWidth / 2, mapHeight / 2)
-      //       .scale(Math.min(8, 0.9 / Math.max((x1 - x0) / mapWidth, (y1 - y0) / mapHeight)))
-      //       .translate(-(x0 + x1) / 2, -(y0 + y1) / 2),
-      //     d3.pointer(event, svg.node())
-      //   );
-      // }
 
       // reset to original scale
       function reset() {
