@@ -3,6 +3,7 @@
 <head>
   <script src="https://d3js.org/d3.v6.min.js"></script>
   <script src="https://d3js.org/topojson.v3.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
   <style>
     .country {
@@ -103,6 +104,7 @@
       stroke-opacity: 0.5;
       stroke-width: 1.25px;
     }
+
   </style>
 </head>
 
@@ -136,6 +138,8 @@
         aria-hidden="true">Jul-Sep</span></button>
     <button type="button" class="btn btn-default" id="autumn"><span 
         aria-hidden="true">Oct-Dec</span></button>
+    <button type="button" class="btn btn-default" id="resetSeason"><span 
+      aria-hidden="true">Whole Year</span></button>
   </div>
 
   <script>
@@ -153,6 +157,8 @@
     var parseDate = d3.timeParse("%y-%m-%d");
     const DEFAULT_DATE = formatDateIntoYear(new Date("1980-02-01"));
     var curYear = new Date("1980-02-01");
+    var curStartMonth = null;
+    var curEndMonth = null;
 
 
     const requestData1 = async function () {
@@ -270,7 +276,8 @@
 
 
       // Make a d3 color scale for frequency    
-      const minMax = d3.extent(cnt, d => countryCounts[d.name]);
+      console.log(tempData);
+      const minMax = [-5,27];
 
       var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
@@ -305,6 +312,8 @@
         if (startMonth != null){
           startTime = changeMonthDays(year,startMonth);
           endTime = changeMonthDays(year,endMonth);
+          year = formatDateIntoYear(year);
+          label.attr("x", x(year)).text(year);
           console.log(startTime);
           console.log(endTime);
         }else{
@@ -390,7 +399,7 @@
 
 
         // Make a d3 color scale for frequency    
-        const minMax = d3.extent(cnt, d => countryCounts[d.name]);
+        const minMax = [-5,27];
 
         var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
@@ -441,7 +450,7 @@
           .call(d3.drag()
               .on("start.interrupt", function() { slider.interrupt(); })
               .on("start drag", function(event) { 
-                updateTemparature(year=x.invert(event.x)); 
+                updateTemparature(year=x.invert(event.x),startMonth=curStartMonth,endMonth = curEndMonth); 
                 curYear = x.invert(event.x)}));
 
       slider.insert("g", ".track-overlay")
@@ -470,19 +479,36 @@
 
 
       d3.select('#winter').on('click', () => {
-        updateTemparature(year = curYear, startMonth = 0, endMonth = 3);
+        curStartMonth = 0;
+        curEndMonth = 3;
+        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
       
       d3.select('#spring').on('click', () => {
-        updateTemparature(year = curYear, startMonth = 3, endMonth = 6);
+        curStartMonth = 3;
+        curEndMonth = 6;
+        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
 
+
+
+
       d3.select('#summer').on('click', () => {
-        updateTemparature(year = curYear, startMonth = 6, endMonth = 8);
+        curStartMonth = 6;
+        curEndMonth = 8;
+        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
 
       d3.select('#autumn').on('click', () => {
-        updateTemparature(year = curYear, startMonth = 8, endMonth = 11);
+        curStartMonth = 8;
+        curEndMonth = 11;
+        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
+      });
+
+      d3.select('#resetSeason').on('click', () => {
+        curStartMonth = null;
+        curEndMonth = null;
+        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
 
       // d3.select('#spring').on('click', () => {
