@@ -27,6 +27,12 @@
       fill: none;
     }
 
+    .co2bar {
+      position: fixed;
+      left: 20;
+      bottom: 305;
+    }
+
     #map {
       float: left;
       display: inline;
@@ -40,7 +46,7 @@
 
     #float-button-group {
       position: fixed;
-      left: 10;
+      left: 20;
       opacity: 0.5;
     }
 
@@ -50,8 +56,9 @@
 
     #season-button-group {
       position: fixed;
-      left: 1200;
-      opacity: 0.5;
+      left: 20;
+      bottom: 260;
+      opacity: 1;
     }
 
     #season-button-group:hover {
@@ -66,16 +73,15 @@
       height: 100px;
       padding: 0 5px;
       position: absolute;
-      top: 205px;
-      left: 25px;
+      top: 215px;
+      left: 35px;
     }
 
     .ticks {
       font-size: 10px;
     }
 
-    .track
-    .track-inset,
+    .track .track-inset,
     .track-overlay {
       stroke-linecap: round;
     }
@@ -104,42 +110,44 @@
       stroke-opacity: 0.5;
       stroke-width: 1.25px;
     }
-
   </style>
 </head>
 
 <body>
-  <p>Project2</p>
-
-  <div id="slider"></div>
-  <div id="map">
-    <div class="btn-group-vertical" role="group" id="float-button-group">
-      <button type="button" class="btn btn-default" id="in"><span class="glyphicon glyphicon-zoom-in"
-          aria-hidden="true"></span></button>
-      <button type="button" class="btn btn-default" id="out"><span class="glyphicon glyphicon-zoom-out"
-          aria-hidden="true"></span></button>
-      <button type="button" class="btn btn-default" id="reset"><span class="glyphicon glyphicon-screenshot"
-          aria-hidden="true"></span></button>
-    </div>
-    <input type="range" value="1" min="1" max="8" orient="vertical" id="map-zoomer" />
-    <svg id="worldmap" height="610" width="960"></svg>
+  <div style="margin-left: 20;">
+    <h3>Global Temperature Change and Carbon Dioxide Emission Between 1980 and 2013</h3>
   </div>
 
-  <div id="legend">
-    <svg id="colorLegend" height="600" width="200" style="background: #fff;"></svg>
+  <div id="slider"></div>
+  <div id="whole_map" style="margin-left: 20">
+    <div id="map">
+      <div class="btn-group-vertical" role="group" id="float-button-group">
+        <button type="button" class="btn btn-default" id="in"><span class="glyphicon glyphicon-zoom-in"
+            aria-hidden="true"></span></button>
+        <button type="button" class="btn btn-default" id="out"><span class="glyphicon glyphicon-zoom-out"
+            aria-hidden="true"></span></button>
+        <button type="button" class="btn btn-default" id="reset"><span class="glyphicon glyphicon-screenshot"
+            aria-hidden="true"></span></button>
+      </div>
+      <input type="range" value="1" min="1" max="8" orient="vertical" id="map-zoomer" />
+      <svg id="worldmap" height="610" width="960"></svg>
+    </div>
+
+    <div id="legend">
+      <svg id="colorLegend" height="600" width="200" style="background: #fff;"></svg>
+    </div>
   </div>
 
   <div class="btn-group-horizontal" role="group" id="season-button-group">
-    <button type="button" class="btn btn-default" id="winter"><span
-        aria-hidden="true">Jan-Mar</span></button>
-    <button type="button" class="btn btn-default" id="spring"><span
-        aria-hidden="true">Apr-June</span></button>
-    <button type="button" class="btn btn-default" id="summer"><span 
-        aria-hidden="true">Jul-Sep</span></button>
-    <button type="button" class="btn btn-default" id="autumn"><span 
-        aria-hidden="true">Oct-Dec</span></button>
-    <button type="button" class="btn btn-default" id="resetSeason"><span 
-      aria-hidden="true">Whole Year</span></button>
+    <button type="button" class="btn btn-default" id="winter"><span aria-hidden="true">Jan-Mar</span></button>
+    <button type="button" class="btn btn-default" id="spring"><span aria-hidden="true">Apr-June</span></button>
+    <button type="button" class="btn btn-default" id="summer"><span aria-hidden="true">Jul-Sep</span></button>
+    <button type="button" class="btn btn-default" id="autumn"><span aria-hidden="true">Oct-Dec</span></button>
+    <button type="button" class="btn btn-default" id="resetSeason"><span aria-hidden="true">Whole Year</span></button>
+  </div>
+
+  <div class="co2bar">
+    <svg id="co2" height="27" width="900"></svg>
   </div>
 
   <script>
@@ -173,7 +181,7 @@
       // Pick out topographic features and build d3 helpers
       var countries = topojson.feature(world, world.objects.countries);
       var countriesMesh = topojson.mesh(world, world.objects.countries);
-      var projection = d3.geoNaturalEarth1() //geoMercator() //geoNaturalEarth1
+      var projection = d3.geoMercator() //geoMercator() //geoNaturalEarth1
       var path = d3.geoPath().projection(projection);
 
       var graticule = d3.geoGraticule10();       // Add a graticule
@@ -192,9 +200,24 @@
         .attr("d", path);
 
       /////////////////////////////////////////////////
-      // 2. Import temperature data
+      // 2. Import data
       /////////////////////////////////////////////////
       var tempData = await d3.csv("Temperatures.csv");
+      var co2Data = await d3.csv("CO2.csv");
+      console.log(co2Data)
+
+      var co2;
+      co2Data.forEach((d) => {
+        if (DEFAULT_DATE == d.Year) {
+          co2 = d.CO2_concentrations;
+        }
+      })
+
+      var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
+      const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]);
+      const lengthScale = d3.scaleLinear().domain(co2Extent).range([450, 960]);
+      drawCO2Bar(co2, lengthScale, colorScale2)
+
 
       tempData = tempData.filter(d => d['AverageTemperature'] !== ""); // filter out blank data
       // console.log(tempData)
@@ -217,39 +240,39 @@
       //   }
       // })
 
-      curFilteredData = tempData.filter(function(d) {
-          return d.dt >= DEFAULT_DATE && d.dt < DEFAULT_DATE+1;
-        })
-        // let filterFunc = d => d["dt"] <= data;
-        // tempData = tempData.filter( d => pointPassesFilters(d) ); 
-        curFilteredData.forEach((d, i) => {
-          var country  = d.Country;
-          // make a list of all the countries
-          if (country != all_countries[0]) {
-            all_countries.splice(0, 0, country);
-          }
-          // make a map of each country and a list of all its temperatures in a year 
-          if (!(country in country_avgTemp)){
-            // take all the temperatrues of a country in a  list
-            var temperature_list = [];
-            temperature_list.push(d.AverageTemperature);
-            country_avgTemp[country] = temperature_list;
-          }else{
-            temperature_list = country_avgTemp[country];
-            temperature_list.push(d.AverageTemperature);
-            country_avgTemp[country] = temperature_list;
-          }
-        });
-        console.log(country_avgTemp)
+      curFilteredData = tempData.filter(function (d) {
+        return d.dt >= DEFAULT_DATE && d.dt < DEFAULT_DATE + 1;
+      })
+      // let filterFunc = d => d["dt"] <= data;
+      // tempData = tempData.filter( d => pointPassesFilters(d) ); 
+      curFilteredData.forEach((d, i) => {
+        var country = d.Country;
+        // make a list of all the countries
+        if (country != all_countries[0]) {
+          all_countries.splice(0, 0, country);
+        }
+        // make a map of each country and a list of all its temperatures in a year 
+        if (!(country in country_avgTemp)) {
+          // take all the temperatrues of a country in a  list
+          var temperature_list = [];
+          temperature_list.push(d.AverageTemperature);
+          country_avgTemp[country] = temperature_list;
+        } else {
+          temperature_list = country_avgTemp[country];
+          temperature_list.push(d.AverageTemperature);
+          country_avgTemp[country] = temperature_list;
+        }
+      });
+      console.log(country_avgTemp)
 
       // Use the temperature list to calculate the average temperature in a year of each country
-      Object.keys(country_avgTemp).forEach(function(key) {
-          temperature_list = country_avgTemp[key];
-          var total = 0;
-          for (i = 0; i < temperature_list.length; i++) {
-            total += Number(temperature_list[i]);
-          }
-          country_avgTemp[key] = total / temperature_list.length;
+      Object.keys(country_avgTemp).forEach(function (key) {
+        temperature_list = country_avgTemp[key];
+        var total = 0;
+        for (i = 0; i < temperature_list.length; i++) {
+          total += Number(temperature_list[i]);
+        }
+        country_avgTemp[key] = total / temperature_list.length;
       });
 
       // Generate the data we will use
@@ -265,12 +288,12 @@
       });
 
       cnt.forEach(row => {
-          Object.keys(country_avgTemp).forEach(function(key) {
-            if (key === row.name) {
-              row.temperature = country_avgTemp[key];
-            }
-          })
-          row.temperature = Number(row.temperature)
+        Object.keys(country_avgTemp).forEach(function (key) {
+          if (key === row.name) {
+            row.temperature = country_avgTemp[key];
+          }
+        })
+        row.temperature = Number(row.temperature)
       })
 
       // fiter out the data with no information on temperature and id
@@ -286,7 +309,7 @@
       // Make a d3 color scale for frequency    
       console.log(tempData);
       // Make a d3 color scale for frequency    
-      var minMax =  d3.extent(cnt, d => countryCounts[d.name]);
+      var minMax = d3.extent(cnt, d => countryCounts[d.name]);
 
       var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
@@ -302,38 +325,55 @@
       drawLegend(d3.select("#colorLegend"), colorScale);
 
       function changeMonthDays(d, qty) {
-          var dd = d.getDate();
-          var mm = d.getMonth();
-          var yyyy = d.getFullYear();
-          return new Date(yyyy, qty, 1);
+        var dd = d.getDate();
+        var mm = d.getMonth();
+        var yyyy = d.getFullYear();
+        return new Date(yyyy, qty, 1);
       }
 
       function updateTemparature(year, startMonth = undefined, endMonth = undefined) {
         d3.select('#colorLegend')
           .selectAll('*')
-          .remove();   
+          .remove();
+
+        d3.select('#co2')
+          .selectAll('*')
+          .remove();
 
         handle.attr("cx", x(year));
 
-
-        if (startMonth != null){
-          startTime = changeMonthDays(year,startMonth);
-          endTime = changeMonthDays(year,endMonth);
+        if (startMonth != null) {
+          startTime = changeMonthDays(year, startMonth);
+          endTime = changeMonthDays(year, endMonth);
           year = formatDateIntoYear(year);
           label.attr("x", x(year)).text(year);
           console.log(startTime);
           console.log(endTime);
-        }else{
+        } else {
           year = formatDateIntoYear(year);
           label.attr("x", x(year)).text(year);
           console.log(year);
         }
 
+        var co2;
+        co2Data.forEach((d) => {
+          if (year == d.Year) {
+            co2 = d.CO2_concentrations;
+          }
+        })
+
+        var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
+        const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]);
+        const lengthScale = d3.scaleLinear().domain(co2Extent).range([450, 960]);
+        drawCO2Bar(co2, lengthScale, colorScale2)
+
+
+
         var all_countries = [];
         var country_avgTemp = {};
         console.log(new Date(tempData[0].dt) < year);
-        curFilteredData = tempData.filter(function(d) {
-          if (startMonth!= null){
+        curFilteredData = tempData.filter(function (d) {
+          if (startMonth != null) {
             time = new Date(d.dt);
             return time >= startTime && time <= endTime;
           }
@@ -343,15 +383,15 @@
         // let filterFunc = d => d["dt"] <= data;
         // tempData = tempData.filter( d => pointPassesFilters(d) ); 
         curFilteredData.forEach((d, i) => {
-          var country  = d.Country;
+          var country = d.Country;
           if (country != all_countries[0]) {
             all_countries.splice(0, 0, country);
           }
-          if (!(country in country_avgTemp)){
+          if (!(country in country_avgTemp)) {
             var temperature_list = [];
             temperature_list.push(d.AverageTemperature);
             country_avgTemp[country] = temperature_list;
-          }else{
+          } else {
             temperature_list = country_avgTemp[country];
             temperature_list.push(d.AverageTemperature);
             country_avgTemp[country] = temperature_list;
@@ -359,7 +399,7 @@
         });
 
 
-        Object.keys(country_avgTemp).forEach(function(key) {
+        Object.keys(country_avgTemp).forEach(function (key) {
           temperature_list = country_avgTemp[key];
           var total = 0;
           for (i = 0; i < temperature_list.length; i++) {
@@ -383,14 +423,14 @@
         });
 
         cnt.forEach(row => {
-          Object.keys(country_avgTemp).forEach(function(key) {
+          Object.keys(country_avgTemp).forEach(function (key) {
             if (key === row.name) {
               row.temperature = country_avgTemp[key];
             }
           })
           row.temperature = Number(row.temperature)
         })
-        
+
         cnt = cnt.filter(d => d['temperature'] && d['id']);
 
 
@@ -401,7 +441,7 @@
 
 
         // Make a d3 color scale for frequency    
-        var minMax =  d3.extent(cnt, d => countryCounts[d.name]);
+        var minMax = d3.extent(cnt, d => countryCounts[d.name]);
 
         var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
@@ -415,23 +455,23 @@
 
         // Use the extra legend code to draw a legend
         drawLegend(d3.select("#colorLegend"), colorScale);
-      
+
       }
 
 
 
 
-      var startDate = new Date("1980-02-01"), endDate = new Date("2012-12-01");
+      var startDate = new Date("1980-02-01"), endDate = new Date("2013-09-01");
 
       var svgSlider = d3.select("#slider")
         .append("svg")
         .attr("width", 1000)
         .attr("height", 70);
-    
+
       var x = d3.scaleTime()
-          .domain([startDate, endDate])
-          .range([0, width])
-          .clamp(true);
+        .domain([startDate, endDate])
+        .range([0, width])
+        .clamp(true);
 
 
 
@@ -439,45 +479,47 @@
 
 
       var slider = svgSlider.append("g")
-          .attr("class", "slider")
-          .attr("transform", "translate(" + 25 + "," + 50 / 2 + ")");;
+        .attr("class", "slider")
+        .attr("transform", "translate(" + 25 + "," + 50 / 2 + ")");;
 
       slider.append("line")
-          .attr("class", "track")
-          .attr("x1", x.range()[0])
-          .attr("x2", x.range()[1])
-        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
-          .attr("class", "track-inset")
-        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
-          .attr("class", "track-overlay")
-          .call(d3.drag()
-              .on("start.interrupt", function() { slider.interrupt(); })
-              .on("start drag", function(event) { 
-                updateTemparature(year=x.invert(event.x),startMonth=curStartMonth,endMonth = curEndMonth); 
-                curYear = x.invert(event.x)}));
+        .attr("class", "track")
+        .attr("x1", x.range()[0])
+        .attr("x2", x.range()[1])
+        .select(function () { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-inset")
+        .select(function () { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-overlay")
+        .call(d3.drag()
+          .on("start.interrupt", function () { slider.interrupt(); })
+          .on("start drag", function (event) {
+            updateTemparature(year = x.invert(event.x), startMonth = curStartMonth, endMonth = curEndMonth);
+            curYear = x.invert(event.x)
+          }));
 
       slider.insert("g", ".track-overlay")
-          .attr("class", "ticks")
-          .attr("transform", "translate(0," + 18 + ")")
+        .attr("class", "ticks")
+        .attr("transform", "translate(0," + 18 + ")")
         .selectAll("text")
-          .data(x.ticks(16))
-          .enter()
-          .append("text")
-          .attr("x", x)
-          .attr("y", 10)
-          .attr("text-anchor", "middle")
-          .text(function(d) { 
-            return formatDateIntoYear(d); });
+        .data(x.ticks(16))
+        .enter()
+        .append("text")
+        .attr("x", x)
+        .attr("y", 10)
+        .attr("text-anchor", "middle")
+        .text(function (d) {
+          return formatDateIntoYear(d);
+        });
 
       var handle = slider.insert("circle", ".track-overlay")
-          .attr("class", "handle")
-          .attr("r", 9);
+        .attr("class", "handle")
+        .attr("r", 9);
 
-      var label = slider.append("text")  
-          .attr("class", "label")
-          .attr("text-anchor", "middle")
-          .text(formatDateIntoYear(startDate))
-          .attr("transform", "translate(0," + (-15) + ")");
+      var label = slider.append("text")
+        .attr("class", "label")
+        .attr("text-anchor", "middle")
+        .text(formatDateIntoYear(startDate))
+        .attr("transform", "translate(0," + (-15) + ")");
 
 
 
@@ -486,7 +528,7 @@
         curEndMonth = 3;
         updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
-      
+
       d3.select('#spring').on('click', () => {
         curStartMonth = 3;
         curEndMonth = 6;
@@ -738,6 +780,17 @@
   </script>
 
   <script>
+    function drawCO2Bar(data, lengthScale, colorScale) {
+      d3.select('#co2').datum(data)
+        .attr("width", lengthScale(data))
+        .style("background-color", colorScale(Number(data)));
+
+      d3.select('#co2').append('text')
+        .attr("x", "5")
+        .attr("y", "18")
+        .attr("fill", 'white')
+        .text("CO2 Concentration: " + data + "ppm")
+    }
     // Function needs a d3 selected SVG canvas where it will draw the legend and a source color scale
     function drawLegend(legend, legendColorScale) {
       //const legend = d3.select("#colorLegend");
@@ -759,11 +812,11 @@
       }
       legend.append("g")
         .attr("class", "colorbar axis")
-        .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" +  "translate(" + (-10) + "," + (-470) + ")")
+        .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" + "translate(" + (-10) + "," + (-470) + ")")
         .call(barAxis);
       // Draw rects of color down the bar
       let bar = legend.append("g")
-        .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" +  "translate(" + (-10) + "," + (-500) + ")")
+        .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" + "translate(" + (-10) + "," + (-500) + ")")
       for (let i = 0; i < legendWidth - 40; i = i + stepSize) {
         bar.append("rect")
           .attr("x", i)
