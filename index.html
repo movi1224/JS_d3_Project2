@@ -143,7 +143,7 @@
   </div>
 
   <script>
-    // Fast food map
+    // World map
     const svg = d3.select("#worldmap");
     const width = svg.attr("width");
     const height = svg.attr("height");
@@ -152,6 +152,7 @@
     // No margins here since our US map already has a specific projection to match to size
     const map = svg.append("g");
 
+    // Format the date in the data
     var formatDateIntoYear = d3.timeFormat("%Y");
     var formatDate = d3.timeFormat("%b %Y");
     var parseDate = d3.timeParse("%y-%m-%d");
@@ -159,7 +160,6 @@
     var curYear = new Date("1980-02-01");
     var curStartMonth = null;
     var curEndMonth = null;
-
 
     const requestData1 = async function () {
 
@@ -224,10 +224,13 @@
         // tempData = tempData.filter( d => pointPassesFilters(d) ); 
         curFilteredData.forEach((d, i) => {
           var country  = d.Country;
+          // make a list of all the countries
           if (country != all_countries[0]) {
             all_countries.splice(0, 0, country);
           }
+          // make a map of each country and a list of all its temperatures in a year 
           if (!(country in country_avgTemp)){
+            // take all the temperatrues of a country in a  list
             var temperature_list = [];
             temperature_list.push(d.AverageTemperature);
             country_avgTemp[country] = temperature_list;
@@ -237,7 +240,9 @@
             country_avgTemp[country] = temperature_list;
           }
         });
+        console.log(country_avgTemp)
 
+      // Use the temperature list to calculate the average temperature in a year of each country
       Object.keys(country_avgTemp).forEach(function(key) {
           temperature_list = country_avgTemp[key];
           var total = 0;
@@ -252,6 +257,7 @@
       var cnt = [];
       var idToCountry = {}  // idToCountry[ countryID ] -> CountryName
 
+      // make a list of pairs of country names and its id, to fit the location in the geoJSON
       countries.features.forEach(row => {
         cnt.push({ id: row.id, name: row.properties.name })
         countryCounts[row.properties.name] = 0;
@@ -267,9 +273,11 @@
           row.temperature = Number(row.temperature)
       })
 
+      // fiter out the data with no information on temperature and id
       cnt = cnt.filter(d => d['temperature'] && d['id']);
 
-
+      console.log(cnt)
+      console.log(countryCounts)
       cnt.forEach(row => {
         countryCounts[row.name] = row.temperature;
       })
@@ -277,12 +285,13 @@
 
       // Make a d3 color scale for frequency    
       console.log(tempData);
-      const minMax = [-5,27];
+      // Make a d3 color scale for frequency    
+      var minMax =  d3.extent(cnt, d => countryCounts[d.name]);
 
       var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
-      const colorScale = d3.scaleQuantize()
-        .domain(minMax)
+      var colorScale = d3.scaleQuantile()
+        .domain(Object.values(countryCounts))
         .range(colors);
 
       // Recolor the states to make a choropleth map
@@ -292,8 +301,6 @@
       // Use the extra legend code to draw a legend
       drawLegend(d3.select("#colorLegend"), colorScale);
 
-
-
       function changeMonthDays(d, qty) {
           var dd = d.getDate();
           var mm = d.getMonth();
@@ -301,10 +308,10 @@
           return new Date(yyyy, qty, 1);
       }
 
-
-
       function updateTemparature(year, startMonth = undefined, endMonth = undefined) {
-
+        d3.select('#colorLegend')
+          .selectAll('*')
+          .remove();   
 
         handle.attr("cx", x(year));
 
@@ -321,7 +328,6 @@
           label.attr("x", x(year)).text(year);
           console.log(year);
         }
-
 
         var all_countries = [];
         var country_avgTemp = {};
@@ -351,10 +357,6 @@
             country_avgTemp[country] = temperature_list;
           }
         });
-
-
-
-
 
 
         Object.keys(country_avgTemp).forEach(function(key) {
@@ -399,12 +401,12 @@
 
 
         // Make a d3 color scale for frequency    
-        const minMax = [-5,27];
+        var minMax =  d3.extent(cnt, d => countryCounts[d.name]);
 
         var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
-        const colorScale = d3.scaleQuantize()
-          .domain(minMax)
+        var colorScale = d3.scaleQuantile()
+          .domain(Object.values(countryCounts))
           .range(colors);
 
         // Recolor the states to make a choropleth map
@@ -412,6 +414,7 @@
           .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
 
         // Use the extra legend code to draw a legend
+        drawLegend(d3.select("#colorLegend"), colorScale);
       
       }
 
@@ -772,7 +775,6 @@
       // Put lines in to mark actual min and max of our data
       bar.append("line").attr("stroke", "white").attr("stroke-width", 3).attr("x1", barScale(legendMinMax[0])).attr("x2", barScale(legendMinMax[0])).attr("y1", 0).attr("y1", barHeight + 4);
       bar.append("line").attr("stroke", "white").attr("stroke-width", 3).attr("x1", barScale(legendMinMax[1])).attr("x2", barScale(legendMinMax[1])).attr("y1", 0).attr("y1", barHeight + 4);
-
     }
 
   </script>
