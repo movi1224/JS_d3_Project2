@@ -115,7 +115,7 @@
 
 <body>
   <div style="margin-left: 20;">
-    <h3>Global Temperature Change and Carbon Dioxide Emission Between 1980 and 2013</h3>
+    <h3>Global Temperature Change and Carbon Dioxide Emission Between 1980 and 2012</h3>
   </div>
 
   <div id="slider"></div>
@@ -137,6 +137,8 @@
       <svg id="colorLegend" height="600" width="200" style="background: #fff;"></svg>
     </div>
   </div>
+
+  <div id="line_chart"></div>
 
   <div class="btn-group-horizontal" role="group" id="season-button-group">
     <button type="button" class="btn btn-default" id="winter"><span aria-hidden="true">Jan-Mar</span></button>
@@ -160,6 +162,20 @@
     // No margins here since our US map already has a specific projection to match to size
     const map = svg.append("g");
 
+    const lineChartMargin = {top: 10, right: 50, bottom: 40, left: 50};
+    const lineChartWidth = 560 - lineChartMargin.left - lineChartMargin.right;
+    const lineChartHeight = 500 - lineChartMargin.top - lineChartMargin.bottom;
+
+
+    const lineChart = d3.select("#line_chart")
+                      .append("svg")
+                      .attr("width", lineChartWidth + lineChartMargin.left + lineChartMargin.right)
+                      .attr("height", lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
+                      .append("g")
+                      .attr("transform",
+                            "translate(" + lineChartMargin.left + "," + lineChartMargin.top + ")");
+
+
     // Format the date in the data
     var formatDateIntoYear = d3.timeFormat("%Y");
     var formatDate = d3.timeFormat("%b %Y");
@@ -168,6 +184,8 @@
     var curYear = new Date("1980-02-01");
     var curStartMonth = null;
     var curEndMonth = null;
+
+
 
     const requestData1 = async function () {
 
@@ -204,14 +222,30 @@
       /////////////////////////////////////////////////
       var tempData = await d3.csv("Temperatures.csv");
       var co2Data = await d3.csv("CO2.csv");
-      console.log(co2Data)
+
+      tempData = tempData.filter(function(d) { return new Date(d.dt) < new Date("2013-01-01"); });
+      co2Data = co2Data.filter(function(d) { return new Date(d.Year) < new Date("2013-01-01"); });
+      
+      // Get global average temperature by year
+      var tempDataAvgByYear = d3.rollup(tempData, 
+        v => d3.mean(v, d => d.AverageTemperature), 
+        d => formatDateIntoYear(new Date(d.dt)));
+
+      tempDataAvgByYear = Array.from(tempDataAvgByYear, ([year, temperature]) => ({ year, temperature }));
+      // remove 1979 date
+      tempDataAvgByYear.shift();
+
+      console.log(co2Data);
 
       var co2;
       co2Data.forEach((d) => {
         if (DEFAULT_DATE == d.Year) {
           co2 = d.CO2_concentrations;
         }
+        d.dt = new Date(d.dt);
       })
+
+
 
       var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
       const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]);
@@ -219,8 +253,111 @@
       drawCO2Bar(co2, lengthScale, colorScale2)
 
 
+
+      /////////////////////////////////////////////////
+      // line chart
+      /////////////////////////////////////////////////
+      var yearScale = d3.scaleTime()
+              .domain(d3.extent(co2Data, function(d) { return d.Year; }))
+              .range([ 0, lineChartWidth ]);
+      lineChart.append("g")
+          .attr("transform", "translate(0," + (lineChartHeight+5) + ")")
+          .call(d3.axisBottom(yearScale).ticks(17).tickSizeOuter(0).tickFormat(d3.format("d")));
+
+      lineChart.append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "end")
+        .attr("x", -150)
+        .attr("y", -50)
+        .attr("dy", ".75em")
+        .attr("transform", "rotate(-90)")
+        .text("CO2 Emission");
+
+      
+      var co2Scale = d3.scaleLinear()
+              .domain( d3.extent(co2Data, function(d) { return +d.CO2_concentrations; }) )
+              .range([ lineChartHeight, 0 ]);
+      lineChart.append("g")
+        .attr("transform", "translate(-5,0)")
+        .call(d3.axisLeft(co2Scale).tickSizeOuter(0).tickFormat(d3.format("d")));
+
+      lineChart.append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "end")
+        .attr("x", lineChartWidth/2)
+        .attr("y", lineChartHeight + 30)
+        .text("year");
+
+
+      lineChart.append("g")
+        .attr("transform", "translate(-5,0)")
+        .call(d3.axisLeft(co2Scale).tickSizeOuter(0).tickFormat(d3.format("d")));
+
+      
+      var tempScale = d3.scaleLinear()
+              .domain( d3.extent(tempDataAvgByYear, function(d) { return +d.temperature; }) )
+              .range([ lineChartHeight, 0 ]);
+
+      lineChart.append("g")
+        .attr("transform", "translate("+ (lineChartWidth+5) +",0)")
+        .call(d3.axisRight(tempScale).tickSizeOuter(0));
+
+      lineChart.append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "end")
+        .attr("x", 220)
+        .attr("y", -lineChartWidth-45)
+        .attr("dy", ".75em")
+        .attr("transform", "rotate(90)")
+        .text("Avg Temperature");
+
+      
+      lineChart.append("path")
+            .datum(co2Data)
+            .attr("fill", "none")
+            .attr("stroke", "#69b3a2")
+            .attr("stroke-width", 4)
+            .attr("d", d3.line()
+              .x(function(d) { return yearScale(d.Year) })
+              .y(function(d) { return co2Scale(d.CO2_concentrations) })
+            );
+
+      
+            
+      lineChart.append("path")
+            .datum(tempDataAvgByYear)
+            .attr("fill", "none")
+            .attr("stroke", "#FFDA33")
+            .attr("stroke-width", 4)
+            .attr("d", d3.line()
+              .x(function(d) { return yearScale(d.year) })
+              .y(function(d) { return tempScale(d.temperature) })
+              .curve(d3.curveBasis)
+            );
+
+      lineChart.append("line")
+            .attr("id", "vert-line")
+            .attr("x1", yearScale(DEFAULT_DATE))  
+            .attr("y1", 0)
+            .attr("x2", yearScale(DEFAULT_DATE))  
+            .attr("y2", lineChartHeight+5)
+            .style("stroke-width", 2)
+            .style("stroke", "grey")
+            .style("fill", "none");
+
+
+      lineChart.append("circle").attr("cx",40).attr("cy",60).attr("r", 6).style("fill", "#69b3a2");
+      lineChart.append("circle").attr("cx",40).attr("cy",90).attr("r", 6).style("fill", "#FFDA33");
+      lineChart.append("text").attr("x", 60).attr("y", 60).text("CO2 Emission").style("font-size", "15px").attr("alignment-baseline","middle");
+      lineChart.append("text").attr("x", 60).attr("y", 90).text("Avg Temperature").style("font-size", "15px").attr("alignment-baseline","middle");
+
+
+
+      
+
+
       tempData = tempData.filter(d => d['AverageTemperature'] !== ""); // filter out blank data
-      // console.log(tempData)
+
       tempData.sort((x, y) => {
         return d3.ascending(x.Country, y.Country);
       })
@@ -228,17 +365,6 @@
       var all_countries = [];
       var country_avgTemp = {};
 
-      // var  = formatDateIntoYear("1980-07-01");
-      // tempData.forEach((d, i) => {
-      //   // get all countries in this data
-      //   if (d.Country != all_countries[0]) {
-      //     all_countries.splice(0, 0, d.Country);
-      //   }
-
-      //   if (d.dt >= DEFAULT_DATE && d.dt < DEFAULT_DATE+2) {
-      //     data.push(d);
-      //   }
-      // })
 
       curFilteredData = tempData.filter(function (d) {
         return d.dt >= DEFAULT_DATE && d.dt < DEFAULT_DATE + 1;
@@ -263,7 +389,6 @@
           country_avgTemp[country] = temperature_list;
         }
       });
-      console.log(country_avgTemp)
 
       // Use the temperature list to calculate the average temperature in a year of each country
       Object.keys(country_avgTemp).forEach(function (key) {
@@ -299,8 +424,6 @@
       // fiter out the data with no information on temperature and id
       cnt = cnt.filter(d => d['temperature'] && d['id']);
 
-      console.log(cnt)
-      console.log(countryCounts)
       cnt.forEach(row => {
         countryCounts[row.name] = row.temperature;
       })
@@ -340,7 +463,12 @@
           .selectAll('*')
           .remove();
 
+        
+        d3.selectAll("line#vert-line")
+          .remove();
+
         handle.attr("cx", x(year));
+
 
         if (startMonth != null) {
           startTime = changeMonthDays(year, startMonth);
@@ -354,6 +482,18 @@
           label.attr("x", x(year)).text(year);
           console.log(year);
         }
+
+        lineChart.append("line")
+            .attr("id", "vert-line")
+            .attr("x1", yearScale(year)) 
+            .attr("y1", 0)
+            .attr("x2", yearScale(year)) 
+            .attr("y2", lineChartHeight+5)
+            .style("stroke-width", 2)
+            .style("stroke", "grey")
+            .style("fill", "none");
+
+
 
         var co2;
         co2Data.forEach((d) => {
@@ -461,7 +601,7 @@
 
 
 
-      var startDate = new Date("1980-02-01"), endDate = new Date("2013-09-01");
+      var startDate = new Date("1980-02-01"), endDate = new Date("2012-12-31");
 
       var svgSlider = d3.select("#slider")
         .append("svg")
@@ -501,7 +641,7 @@
         .attr("class", "ticks")
         .attr("transform", "translate(0," + 18 + ")")
         .selectAll("text")
-        .data(x.ticks(16))
+        .data(x.ticks(17))
         .enter()
         .append("text")
         .attr("x", x)
