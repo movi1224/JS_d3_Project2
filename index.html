@@ -231,6 +231,12 @@
         v => d3.mean(v, d => d.AverageTemperature), 
         d => formatDateIntoYear(new Date(d.dt)));
 
+      var tempDataAvgByYear2 = d3.rollup(tempData, 
+        v => d3.min(v, d => d.AverageTemperature), 
+        d => formatDateIntoYear(new Date(d.dt)));
+
+      console.log(tempDataAvgByYear2);
+
       tempDataAvgByYear = Array.from(tempDataAvgByYear, ([year, temperature]) => ({ year, temperature }));
       // remove 1979 date
       tempDataAvgByYear.shift();
