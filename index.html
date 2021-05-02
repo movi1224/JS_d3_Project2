@@ -236,9 +236,9 @@
       /////////////////////////////////////////////////
       // 2. Import data
       /////////////////////////////////////////////////
-      var tempData = await d3.csv("Temperatures.csv");
+      var tempData = await d3.csv("Temperature.csv");
       var co2Data = await d3.csv("CO2.csv");
-      var countryData = await d3.csv("data generation/tempData Aggregate year and country.csv");
+      var countryData = await d3.csv("data generation/tempData_Aggretate.csv");
 
       console.log(countryData)
 
@@ -255,11 +255,11 @@
         if (!(country in countries_temps)) {
           // take all the temperatrues of a country in a  list
           temp_list = [];
-          temp_list.push(Number(d.mean));
+          temp_list.push (Number(Number(d.mean).toFixed(2)));
           countries_temps[country] = temp_list;
         } else {
           temp_list = countries_temps[country];
-          temp_list.push(Number(d.mean));
+          temp_list.push(Number(Number(d.mean).toFixed(2)));
           countries_temps[country] = temp_list; // { country name : a list of the country's all year's average temperature}
         }
       })
@@ -283,13 +283,13 @@
         d => formatDateIntoYear(new Date(d.dt)));
 
 
-      console.log(tempDataAvgByYear2);
+      // console.log(tempDataAvgByYear2);
 
       tempDataAvgByYear = Array.from(tempDataAvgByYear, ([year, temperature]) => ({ year, temperature }));
       // remove 1979 date
       tempDataAvgByYear.shift();
-      console.log(tempDataAvgByYear);
-      console.log(co2Data);
+      // console.log(tempDataAvgByYear);
+      // console.log(co2Data);
 
       var co2;
       co2Data.forEach((d) => {
@@ -449,9 +449,10 @@
         country_avgTemp[key] = total / temperature_list.length;
       });
 
-      //////////////////////////////////////1
-      // Generate the data we will use
-      var countryCounts = {}; // countryCounts[ countryName ] -> count
+      ///////////////////////////////////////////////////
+      ///////// Generate the data we will use ///////////
+      ///////////////////////////////////////////////////
+      var countryTemp = {}; // countryTemp[ countryName ] -> count
       var countryMinMax = {};
       var cnt = [];
       var idToCountry = {}  // idToCountry[ countryID ] -> CountryName
@@ -459,16 +460,17 @@
       // make a list of pairs of country names and its id, to fit the location in the geoJSON
       countries.features.forEach(row => {
         cnt.push({ id: row.id, name: row.properties.name })
-        countryCounts[row.properties.name] = 0;
-        if (all_countries.indexOf(row.properties.name) != -1 && row.id) {
+        countryTemp[row.properties.name] = 0;
+        if (all_countries.indexOf(row.properties.name) != -1) {
           idToCountry[row.id] = row.properties.name;
         }
+        else {console.log(row.properties.name)}
       });
 
       cnt.forEach(row => {
         Object.keys(country_avgTemp).forEach(function (key) {
           if (key === row.name) {
-            row.temperature = country_avgTemp[key];
+            row.temperature = country_avgTemp[key].toFixed(2);
           }
         })
         row.temperature = Number(row.temperature)
@@ -479,28 +481,30 @@
         })
       });
 
+      console.log(cnt)
+
       // fiter out the data with no information on temperature and id
-      cnt = cnt.filter(d => d['temperature'] && d['id']);
+      // cnt = cnt.filter(d => d['temperature'] && d['id']);
 
       cnt.forEach(row => {
-        countryCounts[row.name] = row.temperature;
-        countryMinMax[row.name] = row.temp_mimMax
+        countryTemp[row.name] = row.temperature;
+        countryMinMax[row.name] = row.temp_mimMax;
       })
 
       // Make a d3 color scale for frequency    
       console.log(tempData);
       // Make a d3 color scale for frequency    
-      var minMax = d3.extent(cnt, d => countryCounts[d.name]);
+      var minMax = d3.extent(cnt, d => countryTemp[d.name]);
       console.log(minMax)
 
       var colors = [
-          "0054c9","#1161d1","#206cd6","#3078db","#3e81de","#4987de","#4987de","#6297e3","#73a2e6","#84ade8","#96b9eb","#a6c3ed","#b6cef0","#c4d7f2","#d7e4f7","#e6f0ff","#fff5f5","#fae3e3","#f5d0d0","#edbbbb","#e8acac","#e89e9e","#e38f8f","#db7979","#db6969","#d45757","#c74242","#c23434","#c42727","#ba1a1a","#b31212","#ad0909"
-        ]
+        "#0054c9", "#1161d1", "#206cd6", "#3078db", "#3e81de", "#4987de", "#4987de", "#6297e3", "#73a2e6", "#84ade8", "#96b9eb", "#a6c3ed", "#b6cef0", "#c4d7f2", "#d7e4f7", "#e6f0ff", "#fff5f5", "#fae3e3", "#f5d0d0", "#edbbbb", "#e8acac", "#e89e9e", "#e38f8f", "#db7979", "#db6969", "#d45757", "#c74242", "#c23434", "#c42727", "#ba1a1a", "#b31212", "#ad0909"
+      ]
 
       var cScale = t => d3.interpolateRdBu(1 - t)
       var color = d3.scaleLinear().domain([10, 100]).range(["brown", "steelblue"]);
       var colorData = [];
-      for (var i=0;i<=34;i++){
+      for (var i = 0; i <= 34; i++) {
         colorData.push(i)
       }
       console.log(colorData)
@@ -522,7 +526,7 @@
           if (idToCountry[d.id]) {
             return d3.scaleQuantile()
               .domain(countryMinMax[idToCountry[d.id]])
-              .range(colors)(countryCounts[idToCountry[d.id]]);
+              .range(colors)(countryTemp[idToCountry[d.id]]);
           }
         });
 
@@ -536,12 +540,12 @@
       // var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
       // var colorScale = d3.scaleQuantile()
-      //   .domain(Object.values(countryCounts))
+      //   .domain(Object.values(countryTemp))
       //   .range(colors);
 
       // Recolor the states to make a choropleth map
       // map.selectAll(".country")
-      //   .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
+      //   .style("fill", d => colorScale(countryTemp[idToCountry[d.id]]));
 
       // Use the extra legend code to draw a legend
       drawLegend(d3.select("#colorLegend"), colorScale);
@@ -641,7 +645,7 @@
         // make a list of pairs of country names and its id, to fit the location in the geoJSON
         countries.features.forEach(row => {
           cnt.push({ id: row.id, name: row.properties.name })
-          if (all_countries.indexOf(row.properties.name) != -1 && row.id) {
+          if (all_countries.indexOf(row.properties.name) != -1) {
             idToCountry[row.id] = row.properties.name;
           }
         });
@@ -664,13 +668,14 @@
         cnt = cnt.filter(d => d['temperature'] && d['id']);
 
         cnt.forEach(row => {
-          countryCounts[row.name] = row.temperature;
+          countryTemp[row.name] = row.temperature;
           countryMinMax[row.name] = row.temp_mimMax
         })
 
+        
+
         // Make a d3 color scale for frequency    
-        var minMax = d3.extent(cnt, d => countryCounts[d.name]);
-        console.log(minMax)
+        // var minMax = d3.extent(cnt, d => countryTemp[d.name]);
 
         var cScale = t => d3.interpolateRdBu(1 - t)
         var color = d3.scaleLinear().domain([10, 100]).range(["brown", "steelblue"]);
@@ -681,22 +686,22 @@
             if (idToCountry[d.id]) {
               return d3.scaleQuantile()
                 .domain(countryMinMax[idToCountry[d.id]])
-                .range(colors)(countryCounts[idToCountry[d.id]]);
+                .range(colors)(countryTemp[idToCountry[d.id]]);
             }
           });
 
         // // Make a d3 color scale for frequency    
-        // var minMax = d3.extent(cnt, d => countryCounts[d.name]);
+        // var minMax = d3.extent(cnt, d => countryTemp[d.name]);
 
         // var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
 
         // var colorScale = d3.scaleQuantile()
-        //   .domain(Object.values(countryCounts))
+        //   .domain(Object.values(countryTemp))
         //   .range(colors);
 
         // // Recolor the states to make a choropleth map
         // map.selectAll(".country")
-        //   .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
+        //   .style("fill", d => colorScale(countryTemp[idToCountry[d.id]]));
 
         // // Use the extra legend code to draw a legend
         // drawLegend(d3.select("#colorLegend"), colorScale);
@@ -855,7 +860,6 @@
       let tooltip = tip.append("g")
         .attr("class", "tooltip")
 
-
       var frame = tooltip.append("rect").attr("class", "frame")
         // we style this in <head>
         .attr("x", 0).attr("y", 0)
@@ -865,12 +869,26 @@
 
       const textbox = tooltip.append("g").attr("transform", "translate(10,10)");
 
-      let txt = tooltip.append("text")
+      let txt1 = tooltip.append("text")
         .attr("fill", "black")
         .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
         .attr("x", 10)
         .attr("y", 10);
+
+      let txt2 = tooltip.append("text")
+        .attr("fill", "black")
+        .attr("text-anchor", "left")
+        .attr("alignment-baseline", "hanging")
+        .attr("x", 10)
+        .attr("y", 30);
+
+      let txt3 = tooltip.append("text")
+        .attr("fill", "black")
+        .attr("text-anchor", "left")
+        .attr("alignment-baseline", "hanging")
+        .attr("x", 10)
+        .attr("y", 50);
 
       // mouseover outline
       let momesh = map.append("path")
@@ -885,17 +903,16 @@
         tooltip.style("visibility", "")
         // Find the state SVG element and add stroke
         let country = d3.select(this);
-        let ctID = country.datum().id;
-        let ctName = country.datum().properties.name;
+        let countryID = country.datum().id;
+        let countryName = country.datum().properties.name;
 
-
-        // console.log(country.datum().properties.name)
         //  First, make a new mesh with a filter for only borders of the current state
-        var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === ctID || b.id === ctID; });
+        var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === countryID || b.id === countryID; });
         //  Then apply it to your special mesh that's on top of everything else
         momesh.datum(mo).attr("d", path)
-        txt.text(ctName + " " + ctID + " " + countryCounts[idToCountry[ctID]])
-
+        txt1.text(countryName + " " + countryID + "\n")
+        txt2.text("Temperature: " + countryTemp[idToCountry[countryID]])
+        txt3.text("History Min/Max: " + d3.extent(countryMinMax[idToCountry[countryID]]))
         // let bounds = path.bounds(country.datum());   // Get the pixel boundaries of the state
         // // Place it at the bottom of the state, centered
         // let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
@@ -909,7 +926,7 @@
 
       function mouseLeaves() {
         // Hide when you leave a state
-        // tooltip.style("visibility", "hidden");
+        tooltip.style("visibility", "hidden");
         let country = d3.select(this);
         // Reset old style mouseover stroke
         // state.attr("stroke","none")
@@ -1046,7 +1063,7 @@
       legend.append("g")
         .attr("class", "colorbar axis")
         .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" + "translate(" + (-10) + "," + (-470) + ")")
-        // .call(barAxis);
+      // .call(barAxis);
       // Draw rects of color down the bar
       let bar = legend.append("g")
         .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" + "translate(" + (-10) + "," + (-500) + ")")
