@@ -33,6 +33,21 @@
       bottom: 305;
     }
 
+    g.tooltip {
+      opacity: 1;
+    }
+
+    g.tooltip rect {
+      fill: whitesmoke;
+      stroke: #222;
+      stroke-width: 1px;
+    }
+
+    g.tooltip text {
+      font-size: 20px;
+      font-family: Arial, sans-serif;
+    }
+
     #map {
       float: left;
       display: inline;
@@ -138,6 +153,7 @@
     </div>
   </div>
 
+  <svg id="tool_tip" height="200" width="400" style="background-color: whitesmoke;"></svg>
   <div id="line_chart"></div>
 
   <div class="btn-group-horizontal" role="group" id="season-button-group">
@@ -162,18 +178,18 @@
     // No margins here since our US map already has a specific projection to match to size
     const map = svg.append("g");
 
-    const lineChartMargin = {top: 10, right: 50, bottom: 40, left: 50};
+    const lineChartMargin = { top: 10, right: 50, bottom: 40, left: 50 };
     const lineChartWidth = 560 - lineChartMargin.left - lineChartMargin.right;
     const lineChartHeight = 500 - lineChartMargin.top - lineChartMargin.bottom;
 
 
     const lineChart = d3.select("#line_chart")
-                      .append("svg")
-                      .attr("width", lineChartWidth + lineChartMargin.left + lineChartMargin.right)
-                      .attr("height", lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-                      .append("g")
-                      .attr("transform",
-                            "translate(" + lineChartMargin.left + "," + lineChartMargin.top + ")");
+      .append("svg")
+      .attr("width", lineChartWidth + lineChartMargin.left + lineChartMargin.right)
+      .attr("height", lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
+      .append("g")
+      .attr("transform",
+        "translate(" + lineChartMargin.left + "," + lineChartMargin.top + ")");
 
 
     // Format the date in the data
@@ -197,7 +213,7 @@
       const world = await d3.json("countries-110m.json");
 
       // Pick out topographic features and build d3 helpers
-      var countries = topojson.feature(world, world.objects.countries);
+      var countries = topojson.feature(world, world.objects.countries);  // countries.features stores all the geo info of the countries in topojson
       var countriesMesh = topojson.mesh(world, world.objects.countries);
       var projection = d3.geoMercator() //geoMercator() //geoNaturalEarth1
       var path = d3.geoPath().projection(projection);
@@ -222,25 +238,57 @@
       /////////////////////////////////////////////////
       var tempData = await d3.csv("Temperatures.csv");
       var co2Data = await d3.csv("CO2.csv");
+      var countryData = await d3.csv("data generation/tempData Aggregate year and country.csv");
 
-      tempData = tempData.filter(function(d) { return new Date(d.dt) < new Date("2013-01-01"); });
-      co2Data = co2Data.filter(function(d) { return new Date(d.Year) < new Date("2013-01-01"); });
-      
+      console.log(countryData)
+
+      // Get all year's temperature data in each country
+      var allgeoCountries = [];
+      countries.features.forEach(row => {
+        allgeoCountries.push(row.properties.name)
+      })
+      countries_temps = {}; // { country name : minMax of the country's all year's average temperature}
+      countryData.forEach(d => {
+        var country = d.Country;
+        var temp_list;
+        // make a map of each country and a list of all its temperatures in a year 
+        if (!(country in countries_temps)) {
+          // take all the temperatrues of a country in a  list
+          temp_list = [];
+          temp_list.push(Number(d.mean));
+          countries_temps[country] = temp_list;
+        } else {
+          temp_list = countries_temps[country];
+          temp_list.push(Number(d.mean));
+          countries_temps[country] = temp_list; // { country name : a list of the country's all year's average temperature}
+        }
+      })
+
+      // Object.keys(countries_temps).forEach(function (key) {
+      //   countries_temps[key] = d3.extent(countries_temps[key]);
+      // });
+
+      console.log(countries_temps)
+
+      tempData = tempData.filter(function (d) { return new Date(d.dt) < new Date("2013-01-01"); });
+      co2Data = co2Data.filter(function (d) { return new Date(d.Year) < new Date("2013-01-01"); });
+
       // Get global average temperature by year
-      var tempDataAvgByYear = d3.rollup(tempData, 
-        v => d3.mean(v, d => d.AverageTemperature), 
+      var tempDataAvgByYear = d3.rollup(tempData,
+        v => d3.mean(v, d => d.AverageTemperature),
         d => formatDateIntoYear(new Date(d.dt)));
 
-      var tempDataAvgByYear2 = d3.rollup(tempData, 
-        v => d3.min(v, d => d.AverageTemperature), 
+      var tempDataAvgByYear2 = d3.rollup(tempData,
+        v => d3.min(v, d => d.AverageTemperature),
         d => formatDateIntoYear(new Date(d.dt)));
+
 
       console.log(tempDataAvgByYear2);
 
       tempDataAvgByYear = Array.from(tempDataAvgByYear, ([year, temperature]) => ({ year, temperature }));
       // remove 1979 date
       tempDataAvgByYear.shift();
-
+      console.log(tempDataAvgByYear);
       console.log(co2Data);
 
       var co2;
@@ -251,24 +299,20 @@
         d.dt = new Date(d.dt);
       })
 
-
-
       var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
       const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]);
       const lengthScale = d3.scaleLinear().domain(co2Extent).range([450, 960]);
       drawCO2Bar(co2, lengthScale, colorScale2)
 
-
-
       /////////////////////////////////////////////////
       // line chart
       /////////////////////////////////////////////////
       var yearScale = d3.scaleTime()
-              .domain(d3.extent(co2Data, function(d) { return d.Year; }))
-              .range([ 0, lineChartWidth ]);
+        .domain(d3.extent(co2Data, function (d) { return d.Year; }))
+        .range([0, lineChartWidth]);
       lineChart.append("g")
-          .attr("transform", "translate(0," + (lineChartHeight+5) + ")")
-          .call(d3.axisBottom(yearScale).ticks(17).tickSizeOuter(0).tickFormat(d3.format("d")));
+        .attr("transform", "translate(0," + (lineChartHeight + 5) + ")")
+        .call(d3.axisBottom(yearScale).ticks(17).tickSizeOuter(0).tickFormat(d3.format("d")));
 
       lineChart.append("text")
         .attr("class", "x label")
@@ -279,10 +323,10 @@
         .attr("transform", "rotate(-90)")
         .text("CO2 Emission");
 
-      
+
       var co2Scale = d3.scaleLinear()
-              .domain( d3.extent(co2Data, function(d) { return +d.CO2_concentrations; }) )
-              .range([ lineChartHeight, 0 ]);
+        .domain(d3.extent(co2Data, function (d) { return +d.CO2_concentrations; }))
+        .range([lineChartHeight, 0]);
       lineChart.append("g")
         .attr("transform", "translate(-5,0)")
         .call(d3.axisLeft(co2Scale).tickSizeOuter(0).tickFormat(d3.format("d")));
@@ -290,7 +334,7 @@
       lineChart.append("text")
         .attr("class", "x label")
         .attr("text-anchor", "end")
-        .attr("x", lineChartWidth/2)
+        .attr("x", lineChartWidth / 2)
         .attr("y", lineChartHeight + 30)
         .text("year");
 
@@ -299,69 +343,68 @@
         .attr("transform", "translate(-5,0)")
         .call(d3.axisLeft(co2Scale).tickSizeOuter(0).tickFormat(d3.format("d")));
 
-      
+
       var tempScale = d3.scaleLinear()
-              .domain( d3.extent(tempDataAvgByYear, function(d) { return +d.temperature; }) )
-              .range([ lineChartHeight, 0 ]);
+        .domain(d3.extent(tempDataAvgByYear, function (d) { return +d.temperature; }))
+        .range([lineChartHeight, 0]);
 
       lineChart.append("g")
-        .attr("transform", "translate("+ (lineChartWidth+5) +",0)")
+        .attr("transform", "translate(" + (lineChartWidth + 5) + ",0)")
         .call(d3.axisRight(tempScale).tickSizeOuter(0));
 
       lineChart.append("text")
         .attr("class", "x label")
         .attr("text-anchor", "end")
         .attr("x", 220)
-        .attr("y", -lineChartWidth-45)
+        .attr("y", -lineChartWidth - 45)
         .attr("dy", ".75em")
         .attr("transform", "rotate(90)")
         .text("Avg Temperature");
 
-      
-      lineChart.append("path")
-            .datum(co2Data)
-            .attr("fill", "none")
-            .attr("stroke", "#69b3a2")
-            .attr("stroke-width", 4)
-            .attr("d", d3.line()
-              .x(function(d) { return yearScale(d.Year) })
-              .y(function(d) { return co2Scale(d.CO2_concentrations) })
-            );
 
-      
-            
       lineChart.append("path")
-            .datum(tempDataAvgByYear)
-            .attr("fill", "none")
-            .attr("stroke", "#FFDA33")
-            .attr("stroke-width", 4)
-            .attr("d", d3.line()
-              .x(function(d) { return yearScale(d.year) })
-              .y(function(d) { return tempScale(d.temperature) })
-              .curve(d3.curveBasis)
-            );
+        .datum(co2Data)
+        .attr("fill", "none")
+        .attr("stroke", "#69b3a2")
+        .attr("stroke-width", 4)
+        .attr("d", d3.line()
+          .x(function (d) { return yearScale(d.Year) })
+          .y(function (d) { return co2Scale(d.CO2_concentrations) })
+        );
+
+
+
+      lineChart.append("path")
+        .datum(tempDataAvgByYear)
+        .attr("fill", "none")
+        .attr("stroke", "#FFDA33")
+        .attr("stroke-width", 4)
+        .attr("d", d3.line()
+          .x(function (d) { return yearScale(d.year) })
+          .y(function (d) { return tempScale(d.temperature) })
+          .curve(d3.curveBasis)
+        );
 
       lineChart.append("line")
-            .attr("id", "vert-line")
-            .attr("x1", yearScale(DEFAULT_DATE))  
-            .attr("y1", 0)
-            .attr("x2", yearScale(DEFAULT_DATE))  
-            .attr("y2", lineChartHeight+5)
-            .style("stroke-width", 2)
-            .style("stroke", "grey")
-            .style("fill", "none");
+        .attr("id", "vert-line")
+        .attr("x1", yearScale(DEFAULT_DATE))
+        .attr("y1", 0)
+        .attr("x2", yearScale(DEFAULT_DATE))
+        .attr("y2", lineChartHeight + 5)
+        .style("stroke-width", 2)
+        .style("stroke", "grey")
+        .style("fill", "none");
 
 
-      lineChart.append("circle").attr("cx",40).attr("cy",60).attr("r", 6).style("fill", "#69b3a2");
-      lineChart.append("circle").attr("cx",40).attr("cy",90).attr("r", 6).style("fill", "#FFDA33");
-      lineChart.append("text").attr("x", 60).attr("y", 60).text("CO2 Emission").style("font-size", "15px").attr("alignment-baseline","middle");
-      lineChart.append("text").attr("x", 60).attr("y", 90).text("Avg Temperature").style("font-size", "15px").attr("alignment-baseline","middle");
+      lineChart.append("circle").attr("cx", 40).attr("cy", 60).attr("r", 6).style("fill", "#69b3a2");
+      lineChart.append("circle").attr("cx", 40).attr("cy", 90).attr("r", 6).style("fill", "#FFDA33");
+      lineChart.append("text").attr("x", 60).attr("y", 60).text("CO2 Emission").style("font-size", "15px").attr("alignment-baseline", "middle");
+      lineChart.append("text").attr("x", 60).attr("y", 90).text("Avg Temperature").style("font-size", "15px").attr("alignment-baseline", "middle");
+      // End of line chart
 
-
-
-      
-
-
+      /////////////////////////////////////////////////
+      // Temperature data in each year
+      /////////////////////////////////////////////////
       tempData = tempData.filter(d => d['AverageTemperature'] !== ""); // filter out blank data
 
       tempData.sort((x, y) => {
@@ -406,8 +449,10 @@
         country_avgTemp[key] = total / temperature_list.length;
       });
 
+      //////////////////////////////////////1
       // Generate the data we will use
       var countryCounts = {}; // countryCounts[ countryName ] -> count
+      var countryMinMax = {};
       var cnt = [];
       var idToCountry = {}  // idToCountry[ countryID ] -> CountryName
 
@@ -415,7 +460,9 @@
       countries.features.forEach(row => {
         cnt.push({ id: row.id, name: row.properties.name })
         countryCounts[row.properties.name] = 0;
-        idToCountry[row.id] = row.properties.name;
+        if (all_countries.indexOf(row.properties.name) != -1 && row.id) {
+          idToCountry[row.id] = row.properties.name;
+        }
       });
 
       cnt.forEach(row => {
@@ -425,30 +472,76 @@
           }
         })
         row.temperature = Number(row.temperature)
-      })
+        Object.keys(countries_temps).forEach(function (key) {
+          if (key === row.name) {
+            row.temp_mimMax = countries_temps[key];
+          }
+        })
+      });
 
       // fiter out the data with no information on temperature and id
       cnt = cnt.filter(d => d['temperature'] && d['id']);
 
       cnt.forEach(row => {
         countryCounts[row.name] = row.temperature;
+        countryMinMax[row.name] = row.temp_mimMax
       })
-
 
       // Make a d3 color scale for frequency    
       console.log(tempData);
       // Make a d3 color scale for frequency    
       var minMax = d3.extent(cnt, d => countryCounts[d.name]);
+      console.log(minMax)
 
-      var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
+      var colors = [
+          "0054c9","#1161d1","#206cd6","#3078db","#3e81de","#4987de","#4987de","#6297e3","#73a2e6","#84ade8","#96b9eb","#a6c3ed","#b6cef0","#c4d7f2","#d7e4f7","#e6f0ff","#fff5f5","#fae3e3","#f5d0d0","#edbbbb","#e8acac","#e89e9e","#e38f8f","#db7979","#db6969","#d45757","#c74242","#c23434","#c42727","#ba1a1a","#b31212","#ad0909"
+        ]
 
-      var colorScale = d3.scaleQuantile()
-        .domain(Object.values(countryCounts))
-        .range(colors);
+      var cScale = t => d3.interpolateRdBu(1 - t)
+      var color = d3.scaleLinear().domain([10, 100]).range(["brown", "steelblue"]);
+      var colorData = [];
+      for (var i=0;i<=34;i++){
+        colorData.push(i)
+      }
+      console.log(colorData)
+      // var colorScale = d3.scaleSequential(colors).domain(minMax);
+      var colorScale = d3.scaleLinear().domain(colorData).range(colors)
+      console.log(colorScale)
+
+      // countries.features.forEach(d => {
+      //   console.log(countryMinMax[idToCountry[d.id]])
+      // })
+
+      // const colorScale = d3.scaleQuantile()
+      //   .domain(Object.values(stateCounts))
+      //   .range(["#fff", "#d1e8ed", "#adc2da", "#8879b3", "#762b80"]);
+
+
+      map.selectAll(".country")
+        .style("fill", d => {
+          if (idToCountry[d.id]) {
+            return d3.scaleQuantile()
+              .domain(countryMinMax[idToCountry[d.id]])
+              .range(colors)(countryCounts[idToCountry[d.id]]);
+          }
+        });
+
+      // map.selectAll("path.country").data(cnt)  // countries
+      //   .join("path")
+      //   .attr("class", "country")
+      //   .style("fill", d => d3.scaleSequential(d3.interpolateRdBu).domain(d.temp_mimMax) )
+      //   // .on("click", clicked)
+      //   .attr("d", path);
+
+      // var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
+
+      // var colorScale = d3.scaleQuantile()
+      //   .domain(Object.values(countryCounts))
+      //   .range(colors);
 
       // Recolor the states to make a choropleth map
-      map.selectAll(".country")
-        .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
+      // map.selectAll(".country")
+      //   .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
 
       // Use the extra legend code to draw a legend
       drawLegend(d3.select("#colorLegend"), colorScale);
@@ -460,47 +553,43 @@
         return new Date(yyyy, qty, 1);
       }
 
-      function updateTemparature(year, startMonth = undefined, endMonth = undefined) {
-        d3.select('#colorLegend')
-          .selectAll('*')
-          .remove();
+      // Update function
+      function update(year, startMonth = undefined, endMonth = undefined) {
+        // remove the existing element to prevent the overlap on drawing
+        // d3.select('#colorLegend')
+        //   .selectAll('*')
+        //   .remove();
 
         d3.select('#co2')
           .selectAll('*')
           .remove();
 
-        
         d3.selectAll("line#vert-line")
           .remove();
 
-        handle.attr("cx", x(year));
-
+        handle.attr("cx", x(year)); // make the handler of the slider goes with curosr
+        label.attr("x", x(year)).text(formatDateIntoYear(year)); // make the label of the  year goes with the handler
+        year = formatDateIntoYear(year);
 
         if (startMonth != null) {
           startTime = changeMonthDays(year, startMonth);
           endTime = changeMonthDays(year, endMonth);
-          year = formatDateIntoYear(year);
-          label.attr("x", x(year)).text(year);
           console.log(startTime);
           console.log(endTime);
-        } else {
-          year = formatDateIntoYear(year);
-          label.attr("x", x(year)).text(year);
-          console.log(year);
         }
 
+        // A line following the year slected
         lineChart.append("line")
-            .attr("id", "vert-line")
-            .attr("x1", yearScale(year)) 
-            .attr("y1", 0)
-            .attr("x2", yearScale(year)) 
-            .attr("y2", lineChartHeight+5)
-            .style("stroke-width", 2)
-            .style("stroke", "grey")
-            .style("fill", "none");
+          .attr("id", "vert-line")
+          .attr("x1", yearScale(year))
+          .attr("y1", 0)
+          .attr("x2", yearScale(year))
+          .attr("y2", lineChartHeight + 5)
+          .style("stroke-width", 2)
+          .style("stroke", "grey")
+          .style("fill", "none");
 
-
-
+        // get the CO2 emission data and draw the bar representing the CO2 emission
         var co2;
         co2Data.forEach((d) => {
           if (year == d.Year) {
@@ -509,15 +598,11 @@
         })
 
         var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
-        const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]);
-        const lengthScale = d3.scaleLinear().domain(co2Extent).range([450, 960]);
+        const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]); // color changes via the CO2 emission through years
+        const lengthScale = d3.scaleLinear().domain(co2Extent).range([450, 960]); // length changes via the CO2 emission through years
         drawCO2Bar(co2, lengthScale, colorScale2)
 
-
-
-        var all_countries = [];
         var country_avgTemp = {};
-        console.log(new Date(tempData[0].dt) < year);
         curFilteredData = tempData.filter(function (d) {
           if (startMonth != null) {
             time = new Date(d.dt);
@@ -525,14 +610,8 @@
           }
           return d.dt >= year && d.dt < year + 1;
         })
-        console.log(curFilteredData)
-        // let filterFunc = d => d["dt"] <= data;
-        // tempData = tempData.filter( d => pointPassesFilters(d) ); 
         curFilteredData.forEach((d, i) => {
           var country = d.Country;
-          if (country != all_countries[0]) {
-            all_countries.splice(0, 0, country);
-          }
           if (!(country in country_avgTemp)) {
             var temperature_list = [];
             temperature_list.push(d.AverageTemperature);
@@ -554,18 +633,17 @@
           country_avgTemp[key] = total / temperature_list.length;
         });
 
-
-
-
-        var countryCounts = {}; // countryCounts[ countryName ] -> count
+        //////////////////////////////////////1
+        // Generate the data we will use
         var cnt = [];
         var idToCountry = {}  // idToCountry[ countryID ] -> CountryName
 
-
+        // make a list of pairs of country names and its id, to fit the location in the geoJSON
         countries.features.forEach(row => {
           cnt.push({ id: row.id, name: row.properties.name })
-          countryCounts[row.properties.name] = 0;
-          idToCountry[row.id] = row.properties.name;
+          if (all_countries.indexOf(row.properties.name) != -1 && row.id) {
+            idToCountry[row.id] = row.properties.name;
+          }
         });
 
         cnt.forEach(row => {
@@ -575,33 +653,55 @@
             }
           })
           row.temperature = Number(row.temperature)
-        })
+          Object.keys(countries_temps).forEach(function (key) {
+            if (key === row.name) {
+              row.temp_mimMax = countries_temps[key];
+            }
+          })
+        });
 
+        // fiter out the data with no information on temperature and id
         cnt = cnt.filter(d => d['temperature'] && d['id']);
-
 
         cnt.forEach(row => {
           countryCounts[row.name] = row.temperature;
+          countryMinMax[row.name] = row.temp_mimMax
         })
-
-
 
         // Make a d3 color scale for frequency    
         var minMax = d3.extent(cnt, d => countryCounts[d.name]);
+        console.log(minMax)
 
-        var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
+        var cScale = t => d3.interpolateRdBu(1 - t)
+        var color = d3.scaleLinear().domain([10, 100]).range(["brown", "steelblue"]);
+        var colorScale = d3.scaleSequential(colors).domain(minMax);
 
-        var colorScale = d3.scaleQuantile()
-          .domain(Object.values(countryCounts))
-          .range(colors);
-
-        // Recolor the states to make a choropleth map
         map.selectAll(".country")
-          .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
+          .style("fill", d => {
+            if (idToCountry[d.id]) {
+              return d3.scaleQuantile()
+                .domain(countryMinMax[idToCountry[d.id]])
+                .range(colors)(countryCounts[idToCountry[d.id]]);
+            }
+          });
 
-        // Use the extra legend code to draw a legend
-        drawLegend(d3.select("#colorLegend"), colorScale);
+        // // Make a d3 color scale for frequency    
+        // var minMax = d3.extent(cnt, d => countryCounts[d.name]);
 
+        // var colors = ["#3c89d0", "#88c7dc", "#66c2a5", "#abdda4", "#e6f598", "#ffffbf", "#fee08b", "#fdae61", "#f46d43", "#d53e4f", "#9e0142"];
+
+        // var colorScale = d3.scaleQuantile()
+        //   .domain(Object.values(countryCounts))
+        //   .range(colors);
+
+        // // Recolor the states to make a choropleth map
+        // map.selectAll(".country")
+        //   .style("fill", d => colorScale(countryCounts[idToCountry[d.id]]));
+
+        // // Use the extra legend code to draw a legend
+        // drawLegend(d3.select("#colorLegend"), colorScale);
+
+        // drawLegend(d3.select("#colorLegend"), colorScale);
       }
 
 
@@ -619,11 +719,6 @@
         .range([0, width])
         .clamp(true);
 
-
-
-
-
-
       var slider = svgSlider.append("g")
         .attr("class", "slider")
         .attr("transform", "translate(" + 25 + "," + 50 / 2 + ")");;
@@ -639,7 +734,7 @@
         .call(d3.drag()
           .on("start.interrupt", function () { slider.interrupt(); })
           .on("start drag", function (event) {
-            updateTemparature(year = x.invert(event.x), startMonth = curStartMonth, endMonth = curEndMonth);
+            update(year = x.invert(event.x), startMonth = curStartMonth, endMonth = curEndMonth);
             curYear = x.invert(event.x)
           }));
 
@@ -667,39 +762,34 @@
         .text(formatDateIntoYear(startDate))
         .attr("transform", "translate(0," + (-15) + ")");
 
-
-
       d3.select('#winter').on('click', () => {
         curStartMonth = 0;
         curEndMonth = 3;
-        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
+        update(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
 
       d3.select('#spring').on('click', () => {
         curStartMonth = 3;
         curEndMonth = 6;
-        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
+        update(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
-
-
-
 
       d3.select('#summer').on('click', () => {
         curStartMonth = 6;
         curEndMonth = 8;
-        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
+        update(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
 
       d3.select('#autumn').on('click', () => {
         curStartMonth = 8;
         curEndMonth = 11;
-        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
+        update(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
 
       d3.select('#resetSeason').on('click', () => {
         curStartMonth = null;
         curEndMonth = null;
-        updateTemparature(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
+        update(year = curYear, startMonth = curStartMonth, endMonth = curEndMonth);
       });
 
       // d3.select('#spring').on('click', () => {
@@ -707,11 +797,6 @@
       // });
 
       // d3.select('#spring').on('click', reset);
-
-
-
-
-
 
       // 3. Zoom-in & zoom-out features with the slider
       const zoom = d3.zoom() // initiate d3-zoom
@@ -765,27 +850,27 @@
       // 3. Add tooltips to show the name of the country
       /////////////////////////////////////////////////
 
-      let tooltipWidth = 120;
-      let tooltipHeight = 40;
+      var tip = d3.select("#tool_tip");
 
-      let tooltip = map.append("g")
+      let tooltip = tip.append("g")
         .attr("class", "tooltip")
-        .attr("visibility", "hidden");
 
-      tooltip.append("rect")
-        .attr("fill", "black")
-        .attr("opacity", 0.9)
-        .attr("x", -tooltipWidth / 2.0)
-        .attr("y", 0)
-        .attr("width", tooltipWidth)
-        .attr("height", tooltipHeight);
+
+      var frame = tooltip.append("rect").attr("class", "frame")
+        // we style this in <head>
+        .attr("x", 0).attr("y", 0)
+        .attr("rx", 5).attr("ry", 5)  // rx and ry round corners
+        .attr("width", 400)
+        .attr("height", 200);  // set width later
+
+      const textbox = tooltip.append("g").attr("transform", "translate(10,10)");
 
       let txt = tooltip.append("text")
-        .attr("fill", "white")
-        .attr("text-anchor", "middle")
+        .attr("fill", "black")
+        .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
-        .attr("x", 0)
-        .attr("y", 2);
+        .attr("x", 10)
+        .attr("y", 10);
 
       // mouseover outline
       let momesh = map.append("path")
@@ -797,32 +882,34 @@
 
       function mouseEnters() {
         // Make tooltip visible
-        tooltip.style("visibility", "visible")
+        tooltip.style("visibility", "")
         // Find the state SVG element and add stroke
         let country = d3.select(this);
         let ctID = country.datum().id;
         let ctName = country.datum().properties.name;
+
+
         // console.log(country.datum().properties.name)
         //  First, make a new mesh with a filter for only borders of the current state
         var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === ctID || b.id === ctID; });
         //  Then apply it to your special mesh that's on top of everything else
         momesh.datum(mo).attr("d", path)
-        txt.text(ctName);
+        txt.text(ctName + " " + ctID + " " + countryCounts[idToCountry[ctID]])
 
-        let bounds = path.bounds(country.datum());   // Get the pixel boundaries of the state
-        // Place it at the bottom of the state, centered
-        let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
-        let yPos = bounds[1][1];
-        // console.log(xPos, yPos)
+        // let bounds = path.bounds(country.datum());   // Get the pixel boundaries of the state
+        // // Place it at the bottom of the state, centered
+        // let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
+        // let yPos = bounds[1][1];
+        // // console.log(xPos, yPos)
 
-        // Transform the <g> group so that everything moves together easily
-        tooltip.attr("transform", `translate(${xPos},${yPos})`);
+        // // Transform the <g> group so that everything moves together easily
+        // tooltip.attr("transform", `translate(${xPos},${yPos})`);
         tooltip.call(zoom);
       }
 
       function mouseLeaves() {
         // Hide when you leave a state
-        tooltip.style("visibility", "hidden");
+        // tooltip.style("visibility", "hidden");
         let country = d3.select(this);
         // Reset old style mouseover stroke
         // state.attr("stroke","none")
@@ -946,7 +1033,7 @@
       let legendMinMax = d3.extent(legendColorScale.domain()); // way to recover the minMax from most kinds of scales
       console.log(legendMinMax)
       const barHeight = 20;
-      const stepSize = 4; // warning, not using a canvas element so lots of rect tags will be created for low stepSize, causing issues with performance
+      const stepSize = 6; // warning, not using a canvas element so lots of rect tags will be created for low stepSize, causing issues with performance
       // Extend the minmax by 1 in either direction to expose more features
       const pixelScale = d3.scaleLinear().domain([0, legendWidth - 40]).range([legendMinMax[0] - 1, legendMinMax[1] + 1]); // In this case the "data" are pixels, and we get numbers to use in colorScale
       const barScale = d3.scaleLinear().domain([legendMinMax[0] - 1, legendMinMax[1] + 1]).range([0, legendWidth - 40]);
@@ -959,7 +1046,7 @@
       legend.append("g")
         .attr("class", "colorbar axis")
         .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" + "translate(" + (-10) + "," + (-470) + ")")
-        .call(barAxis);
+        // .call(barAxis);
       // Draw rects of color down the bar
       let bar = legend.append("g")
         .attr("transform", "rotate(" + 270 + " " + 560 + " " + 0 + ")" + "translate(" + (-10) + "," + (-500) + ")")
