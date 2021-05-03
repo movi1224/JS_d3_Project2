@@ -42,6 +42,7 @@
     }
 
     @media (max-width: 1000px) {
+
       .column.left,
       .column.right {
         width: 100%;
@@ -143,13 +144,13 @@
     }
 
     .co2bar {
-      margin-left:52px
+      margin-left: 52px
     }
 
-    .tool_tip{
+    .tool_tip {
       padding: 10px;
       width: 100%;
-      height:20%;
+      height: 20%;
     }
 
     g.tooltip {
@@ -260,8 +261,6 @@
     var curStartMonth = null;
     var curEndMonth = null;
 
-
-
     const requestData1 = async function () {
 
       ///////////////////////////////////////////////// 
@@ -329,6 +328,8 @@
       // });
 
       console.log(countries_temps)
+      var tempDataConst = tempData;
+
 
       tempData = tempData.filter(function (d) { return new Date(d.dt) < new Date("2013-01-01"); });
       co2Data = co2Data.filter(function (d) { return new Date(d.Year) < new Date("2013-01-01"); });
@@ -337,13 +338,6 @@
       var tempDataAvgByYear = d3.rollup(tempData,
         v => d3.mean(v, d => d.AverageTemperature),
         d => formatDateIntoYear(new Date(d.dt)));
-
-      var tempDataAvgByYear2 = d3.rollup(tempData,
-        v => d3.min(v, d => d.AverageTemperature),
-        d => formatDateIntoYear(new Date(d.dt)));
-
-
-      // console.log(tempDataAvgByYear2);
 
       tempDataAvgByYear = Array.from(tempDataAvgByYear, ([year, temperature]) => ({ year, temperature }));
       // remove 1979 date
@@ -361,105 +355,173 @@
 
       var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
       const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]);
-      const lengthScale = d3.scaleLinear().domain(co2Extent).range([200,400]);
+      const lengthScale = d3.scaleLinear().domain(co2Extent).range([200, 400]);
       drawCO2Bar(co2, lengthScale, colorScale2)
 
       /////////////////////////////////////////////////
       // line chart
       /////////////////////////////////////////////////
+      // year scale used in the line chart
       var yearScale = d3.scaleTime()
-        .domain(d3.extent(co2Data, function (d) { return d.Year; }))
+        .domain(d3.extent(co2Data, d => d.Year))
         .range([0, lineChartWidth]);
-      lineChart.append("g")
+
+      var firstyearScale = d3.scaleTime()
+        .domain([DEFAULT_DATE, DEFAULT_DATE])
+        .range([0, lineChartWidth]);
+
+      // lineChart.append("g") // bottom axis
+      //   .attr("transform", "translate(0," + (lineChartHeight + 5) + ")")
+      //   .call(d3.axisBottom(yearScale).ticks(17).tickSizeOuter(0).tickFormat(d3.format("d")));
+
+      lineChart.append("g") // bottom axis
+        .attr("class", "x axis")
         .attr("transform", "translate(0," + (lineChartHeight + 5) + ")")
-        .call(d3.axisBottom(yearScale).ticks(17).tickSizeOuter(0).tickFormat(d3.format("d")));
+        .call(d3.axisBottom(firstyearScale).ticks(1).tickSizeOuter(0).tickFormat(d3.format("d")));
 
-      lineChart.append("text")
-        .attr("class", "x label")
-        .attr("text-anchor", "end")
-        .attr("x", -150)
-        .attr("y", -50)
-        .attr("dy", ".75em")
-        .attr("transform", "rotate(-90)")
-        .text("CO2 Emission");
+      // lineChart.append("text") // left y axis label
+      //   .attr("class", "label")
+      //   .attr("text-anchor", "end")
+      //   .attr("x", -150)
+      //   .attr("y", -50)
+      //   .attr("dy", ".75em")
+      //   .attr("transform", "rotate(-90)")
+      //   .text("CO2 Emission");
 
+      // lineChart.append("text") // x axis label
+      //   .attr("class", "label")
+      //   .attr("text-anchor", "end")
+      //   .attr("x", lineChartWidth / 2)
+      //   .attr("y", lineChartHeight + 30)
+      //   .text("year");
+
+      // lineChart.append("g") // left y axis tick
+      //   .attr("transform", "translate(-5,0)")
+      //   .call(d3.axisLeft(co2Scale).tickSizeOuter(0).tickFormat(d3.format("d")));
 
       var co2Scale = d3.scaleLinear()
-        .domain(d3.extent(co2Data, function (d) { return +d.CO2_concentrations; }))
+        .domain(d3.extent(co2Data, d => d.CO2_concentrations))
         .range([lineChartHeight, 0]);
+
+      var initialco2Data = co2Data.filter(function (d) { return new Date(d.Year) <= new Date("1980"); });
+      console.log(co2Data)
+
+      var initialco2Scale = d3.scaleLinear()
+        .domain(d3.extent(initialco2Data, d => d.CO2_concentrations))
+        .range([lineChartHeight, 0]);
+      var initialyearScale = d3.scaleTime()
+        .domain(d3.extent(initialco2Data, d => d.Year))
+        .range([0, lineChartWidth]);
+
+      lineChart.selectAll("co2circle")
+        .data(initialco2Data)
+        .join("circle")
+        .attr("class", "co2circle")
+        .attr("r", 3)
+        .attr("fill", "#823b0e")
+        .attr("cx", d => initialyearScale(d.Year))
+        .attr("cy", d => initialco2Scale(d.CO2_concentrations));
+
       lineChart.append("g")
-        .attr("transform", "translate(-5,0)")
-        .call(d3.axisLeft(co2Scale).tickSizeOuter(0).tickFormat(d3.format("d")));
+        .attr("class", "co2_axis")
+        // .attr("transform", "translate(0,-5)")
+        .call(d3.axisLeft(initialco2Scale).tickSizeOuter(0).tickFormat(function (d) { return d + " ppm" }))
+      // .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0));
 
-      lineChart.append("text")
-        .attr("class", "x label")
-        .attr("text-anchor", "end")
-        .attr("x", lineChartWidth / 2)
-        .attr("y", lineChartHeight + 30)
-        .text("year");
-
-
-      lineChart.append("g")
-        .attr("transform", "translate(-5,0)")
-        .call(d3.axisLeft(co2Scale).tickSizeOuter(0).tickFormat(d3.format("d")));
-
+      lineChart.append("g").lower()
+        .attr("class", "y gridlines")
+        // .attr("transform", "translate(-5,0)")
+        .call(d3.axisLeft(initialco2Scale).tickFormat("").tickSize(-lineChartHeight - 10));
 
       var tempScale = d3.scaleLinear()
-        .domain(d3.extent(tempDataAvgByYear, function (d) { return +d.temperature; }))
+        .domain(d3.extent(tempDataAvgByYear, d => d.temperature))
         .range([lineChartHeight, 0]);
 
+      var initialtempData = tempDataAvgByYear.filter(function (d) { return new Date(d.year) <= new Date("1980"); });
+      console.log(tempDataAvgByYear)
+      // initialtempData = initialtempData.filter(d => d['AverageTemperature'] !== ""); // filter out blank data
+      // Get global average temperature by year
+      // var initialtempDataAvgByYear = d3.rollup(initialtempData,
+      //   v => d3.mean(v, d => d.AverageTemperature),
+      //   d => formatDateIntoYear(new Date(d.dt)));
+      // initialtempDataAvgByYear = Array.from(initialtempDataAvgByYear, ([year, temperature]) => ({ year, temperature }));
+      // // remove 1979 date
+      // initialtempDataAvgByYear.shift();
+
+      var initialtempScale = d3.scaleLinear()
+        .domain(d3.extent(initialtempData, d => d.temperature))
+        .range([lineChartHeight, 0]);
+
+      // lineChart.append("g")
+      //   .attr("transform", "translate(" + (lineChartWidth + 5) + ",0)")
+      //   .call(d3.axisRight(tempScale).tickSizeOuter(0));
+
       lineChart.append("g")
-        .attr("transform", "translate(" + (lineChartWidth + 5) + ",0)")
-        .call(d3.axisRight(tempScale).tickSizeOuter(0));
+        .attr("class", "temp_axis")
+        .attr("transform", "translate(" + (lineChartWidth) + ",0)")
+        .call(d3.axisRight(initialtempScale).tickSizeOuter(0).tickFormat(function (d) { return d3.format(",.2~f")(d) + "\u2103" }))
+        .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0));
 
-      lineChart.append("text")
-        .attr("class", "x label")
-        .attr("text-anchor", "end")
-        .attr("x", 220)
-        .attr("y", -lineChartWidth - 45)
-        .attr("dy", ".75em")
-        .attr("transform", "rotate(90)")
-        .text("Avg Temperature");
+      lineChart.selectAll("temp_circle")
+        .data(initialtempData)
+        .join("circle")
+        .attr("class", "temp_circle")
+        .attr("r", 3)
+        .attr("fill", "#09604c")
+        .attr("cx", lineChartWidth / 2)
+        .attr("cy", lineChartHeight / 2);
 
-
-      lineChart.append("path")
-        .datum(co2Data)
-        .attr("fill", "none")
-        .attr("stroke", "#69b3a2")
-        .attr("stroke-width", 4)
-        .attr("d", d3.line()
-          .x(function (d) { return yearScale(d.Year) })
-          .y(function (d) { return co2Scale(d.CO2_concentrations) })
-        );
-
-
-
-      lineChart.append("path")
-        .datum(tempDataAvgByYear)
-        .attr("fill", "none")
-        .attr("stroke", "#FFDA33")
-        .attr("stroke-width", 4)
-        .attr("d", d3.line()
-          .x(function (d) { return yearScale(d.year) })
-          .y(function (d) { return tempScale(d.temperature) })
-          .curve(d3.curveBasis)
-        );
-
-      lineChart.append("line")
-        .attr("id", "vert-line")
-        .attr("x1", yearScale(DEFAULT_DATE))
-        .attr("y1", 0)
-        .attr("x2", yearScale(DEFAULT_DATE))
-        .attr("y2", lineChartHeight + 5)
-        .style("stroke-width", 2)
-        .style("stroke", "grey")
-        .style("fill", "none");
+      // lineChart.append("text")
+      //   .attr("class", "label")
+      //   .attr("text-anchor", "end")
+      //   .attr("x", 220)
+      //   .attr("y", -lineChartWidth - 45)
+      //   .attr("dy", ".75em")
+      //   .attr("transform", "rotate(90)")
+      //   .text("Avg Temperature");
 
 
-      lineChart.append("circle").attr("cx", 40).attr("cy", 60).attr("r", 6).style("fill", "#69b3a2");
-      lineChart.append("circle").attr("cx", 40).attr("cy", 90).attr("r", 6).style("fill", "#FFDA33");
-      lineChart.append("text").attr("x", 60).attr("y", 60).text("CO2 Emission").style("font-size", "15px").attr("alignment-baseline", "middle");
-      lineChart.append("text").attr("x", 60).attr("y", 90).text("Avg Temperature").style("font-size", "15px").attr("alignment-baseline", "middle");
+      // lineChart.append("path")
+      //   .datum(co2Data)
+      //   .attr("fill", "none")
+      //   .attr("stroke", "#69b3a2")
+      //   .attr("stroke-width", 4)
+      //   .attr("d", d3.line()
+      //     .x(function (d) { return yearScale(d.Year) })
+      //     .y(function (d) { return co2Scale(d.CO2_concentrations) })
+      //   );
+
+      // lineChart.append("path")
+      //   .datum(tempDataAvgByYear)
+      //   .attr("fill", "none")
+      //   .attr("stroke", "#FFDA33")
+      //   .attr("stroke-width", 4)
+      //   .attr("d", d3.line()
+      //     .x(function (d) { return yearScale(d.year) })
+      //     .y(function (d) { return tempScale(d.temperature) })
+      //     .curve(d3.curveBasis)
+      //   );
+
+      // lineChart.append("line")
+      //   .attr("id", "vert-line")
+      //   .attr("x1", yearScale(DEFAULT_DATE))
+      //   .attr("y1", 0)
+      //   .attr("x2", yearScale(DEFAULT_DATE))
+      //   .attr("y2", lineChartHeight + 5)
+      //   .style("stroke-width", 2)
+      //   .style("stroke", "grey")
+      //   .style("fill", "none");
+
+
+      // lineChart.append("circle").attr("cx", 40).attr("cy", 60).attr("r", 6).style("fill", "#69b3a2");
+      // lineChart.append("circle").attr("cx", 40).attr("cy", 90).attr("r", 6).style("fill", "#FFDA33");
+      // lineChart.append("text").attr("x", 60).attr("y", 60).text("CO2 Emission").style("font-size", "15px").attr("alignment-baseline", "middle");
+      // lineChart.append("text").attr("x", 60).attr("y", 90).text("Avg Temperature").style("font-size", "15px").attr("alignment-baseline", "middle");
+      lineChart.append("circle").attr("cx", 20).attr("cy", 5).attr("r", 3).style("fill", "#823b0e");
+      lineChart.append("text").attr("x", 40).attr("y", 5).text("CO2 Emission").style("font-size", "12px").attr("alignment-baseline", "middle");
+      lineChart.append("circle").attr("cx", 20).attr("cy", 20).attr("r", 3).style("fill", "#09604c");
+      lineChart.append("text").attr("x", 40).attr("y", 20).text("Avg Temperature").style("font-size", "12px").attr("alignment-baseline", "middle");
+
       // End of line chart
 
       /////////////////////////////////////////////////
@@ -617,12 +679,16 @@
         return new Date(yyyy, qty, 1);
       }
 
-      // Update function
+      ///////////////////////////////////////
+      //////// Update function
+      ///////////////////////////////////////
       function update(year, startMonth = undefined, endMonth = undefined) {
         // remove the existing element to prevent the overlap on drawing
         // d3.select('#colorLegend')
         //   .selectAll('*')
         //   .remove();
+
+        lineChart.select("g.x.axis").remove();
 
         d3.select('#co2')
           .selectAll('*')
@@ -643,15 +709,23 @@
         }
 
         // A line following the year slected
-        lineChart.append("line")
-          .attr("id", "vert-line")
-          .attr("x1", yearScale(year))
-          .attr("y1", 0)
-          .attr("x2", yearScale(year))
-          .attr("y2", lineChartHeight + 5)
-          .style("stroke-width", 2)
-          .style("stroke", "grey")
-          .style("fill", "none");
+        // lineChart.append("line")
+        //   .attr("id", "vert-line")
+        //   .attr("x1", yearScale(year))
+        //   .attr("y1", 0)
+        //   .attr("x2", yearScale(year))
+        //   .attr("y2", lineChartHeight + 5)
+        //   .style("stroke-width", 2)
+        //   .style("stroke", "grey")
+        //   .style("fill", "none");
+
+        lineChart.append("g") // year scale
+          .attr("class", "x axis")
+          .attr("transform", "translate(0," + (lineChartHeight + 5) + ")")
+          .call(d3.axisBottom(d3.scaleTime()
+            .domain([DEFAULT_DATE, year])
+            .range([0, lineChartWidth])).ticks(10).tickSizeOuter(0).tickFormat(d3.format("d")))
+          .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0.4));
 
         // get the CO2 emission data and draw the bar representing the CO2 emission
         var co2;
@@ -663,8 +737,91 @@
 
         var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
         const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]); // color changes via the CO2 emission through years
-        const lengthScale = d3.scaleLinear().domain(co2Extent).range([200,400]); // length changes via the CO2 emission through years
+        const lengthScale = d3.scaleLinear().domain(co2Extent).range([200, 400]); // length changes via the CO2 emission through years
         drawCO2Bar(co2, lengthScale, colorScale2)
+
+        var updateco2Data = co2Data.filter(function (d) { return new Date(d.Year) <= new Date(year); });
+        var updatetempData = tempDataAvgByYear.filter(function (d) { return new Date(d.year) <= new Date(year); });
+
+        console.log(updateco2Data);
+        console.log(updatetempData);
+
+        var updateyearScale = d3.scaleTime()
+          .domain(d3.extent(updateco2Data, d => d.Year))
+          .range([0, lineChartWidth]);
+
+        var updateco2Scale = d3.scaleLinear()
+          .domain(d3.extent(updateco2Data, d => d.CO2_concentrations))
+          .range([lineChartHeight, 0]);
+
+        var updatetempScale = d3.scaleLinear()
+          .domain(d3.extent(updatetempData, d => d.temperature))
+          .range([lineChartHeight, 0]);
+
+        lineChart.select("g.temp_axis").remove();
+        lineChart.append("g")
+          .attr("class", "temp_axis")
+          .attr("transform", "translate(" + (lineChartWidth) + ",0)")
+          .call(d3.axisRight(updatetempScale).tickSizeOuter(0).tickFormat(function (d) { return d3.format(",.2~f")(d) + "\u2103" }))
+          .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0));
+
+        console.log(35 + "\u2103")
+
+        lineChart.select("g.co2_axis").remove();
+        lineChart.append("g")
+          .attr("class", "co2_axis")
+          // .attr("transform", "translate(0,-5)")
+          .call(d3.axisLeft(updateco2Scale).tickSizeOuter(0).tickFormat(function (d) { return d + " ppm" }))
+          .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0));
+
+        lineChart.select("path.temp_path").remove();
+        lineChart.append("path").datum(updatetempData)
+          .attr("class", "temp_path")
+          .attr("fill", "none")
+          .attr("stroke", "#69b3a2")
+          .attr("stroke-width", 2)
+          .attr("d", d3.line()
+            .x(d => updateyearScale(d.year))
+            .y(d => updatetempScale(d.temperature))
+          );
+
+        lineChart.select("path.co2_path").remove();
+        lineChart.append("path").datum(updateco2Data)
+          .attr("class", "co2_path")
+          .attr("fill", "none")
+          .attr("stroke", "#ed7325")
+          .attr("stroke-width", 2)
+          .attr("d", d3.line()
+            .x(d => updateyearScale(d.Year))
+            .y(d => updateco2Scale(d.CO2_concentrations))
+          );
+
+        lineChart.selectAll("circle.temp_circle").remove();
+        lineChart.selectAll("temp_circle").data(updatetempData)
+          .join("circle")
+          .attr("class", "temp_circle")
+          .attr("r", 3)
+          .attr("fill", "#09604c")
+          .attr("cx", d => updateyearScale(d.year))
+          .attr("cy", d => updatetempScale(d.temperature));
+
+        lineChart.selectAll("circle.co2circle").remove();
+        lineChart.selectAll("co2circle").data(updateco2Data)
+          .join("circle")
+          .attr("class", "co2circle")
+          .attr("r", 3)
+          .attr("fill", "#823b0e")
+          .attr("cx", d => updateyearScale(d.Year))
+          .attr("cy", d => updateco2Scale(d.CO2_concentrations));
+
+        lineChart.select("g.y.gridlines").remove();
+
+        lineChart.append("g").lower()
+          .attr("class", "y gridlines")
+          // .attr("transform", "translate(-5,0)")
+          .call(d3.axisLeft(updateco2Scale).tickFormat("").tickSize(-lineChartHeight - 10));
+
+
 
         var country_avgTemp = {};
         curFilteredData = tempData.filter(function (d) {
