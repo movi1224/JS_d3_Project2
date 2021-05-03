@@ -12,7 +12,7 @@
 
     .header {
       padding: 15px;
-      text-align: center;
+      text-align: left;
       font-size: 45;
       font-weight: 800;
       font-family: 'Arial', sans-serif;
@@ -26,13 +26,13 @@
 
     .column.left {
       background-color: whitesmoke;
-      width: 37%;
+      width: 38%;
     }
 
     .column.right {
       padding-left: 25px;
       background-color: white;
-      width: 63%;
+      width: 62%;
     }
 
     .content:after {
@@ -56,7 +56,10 @@
     #worldmap {
       border-style: solid;
       border-width: 1px;
-      ;
+    }
+
+    .country {
+      transition: fill 0.5s;
     }
 
     #legend {
@@ -89,8 +92,8 @@
       opacity: 1;
     }
 
-    .ticks {
-      font-size: 10px;
+    .tick line {
+      color: #dddddd;
     }
 
     .track .track-inset,
@@ -158,7 +161,7 @@
     }
 
     g.tooltip rect {
-      width: 100%;
+      width: 480;
       fill: whitesmoke;
       stroke: #222;
       stroke-width: 1px;
@@ -191,9 +194,9 @@
     <div class="column left">
       <svg class="tool_tip"></svg>
       <div class="co2bar">
-        <svg id="co2" height="27" width="450"></svg>
+        <svg id="co2" height="27"></svg>
       </div>
-      <div id="line_chart"></div>
+      <div id="line_chart" style="text-align: center;"></div>
       <div class="btn-group-horizontal" role="group" id="season-button-group">
         <button type="button" class="btn btn-default" id="winter"><span aria-hidden="true">Jan-Mar</span></button>
         <button type="button" class="btn btn-default" id="spring"><span aria-hidden="true">Apr-June</span></button>
@@ -221,7 +224,7 @@
         <svg id="worldmap" height="610" width="880"></svg>
       </div>
       <div id="legend">
-        <svg id="colorLegend" height="650" width="80" style="background: #fff;"></svg>
+        <svg id="colorLegend" height="650" width="60" style="background: #fff;"></svg>
       </div>
     </div>
 
@@ -237,19 +240,6 @@
     const mapHeight = height;
     // No margins here since our US map already has a specific projection to match to size
     const map = svg.append("g");
-
-    const lineChartMargin = { top: 10, right: 50, bottom: 40, left: 50 };
-    const lineChartWidth = 560 - lineChartMargin.left - lineChartMargin.right;
-    const lineChartHeight = 500 - lineChartMargin.top - lineChartMargin.bottom;
-
-
-    const lineChart = d3.select("#line_chart")
-      .append("svg")
-      .attr("width", lineChartWidth + lineChartMargin.left + lineChartMargin.right)
-      .attr("height", lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-      .append("g")
-      .attr("transform",
-        "translate(" + lineChartMargin.left + "," + lineChartMargin.top + ")");
 
 
     // Format the date in the data
@@ -355,12 +345,25 @@
 
       var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
       const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]);
-      const lengthScale = d3.scaleLinear().domain(co2Extent).range([200, 400]);
+      const lengthScale = d3.scaleLinear().domain(co2Extent).range([250, 450]);
       drawCO2Bar(co2, lengthScale, colorScale2)
 
       /////////////////////////////////////////////////
       // line chart
       /////////////////////////////////////////////////
+      const lineChartMargin = { top: 10, right: 60, bottom: 40, left: 60 };
+      const lineChartWidth = 600 - lineChartMargin.left - lineChartMargin.right;
+      const lineChartHeight = 500 - lineChartMargin.top - lineChartMargin.bottom;
+
+
+      const lineChart = d3.select("#line_chart")
+        .append("svg")
+        .attr("width", lineChartWidth + lineChartMargin.left + lineChartMargin.right)
+        .attr("height", lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
+        .append("g")
+        .attr("transform",
+          "translate(" + (lineChartMargin.left + 5) + "," + lineChartMargin.top + ")");
+
       // year scale used in the line chart
       var yearScale = d3.scaleTime()
         .domain(d3.extent(co2Data, d => d.Year))
@@ -424,14 +427,12 @@
 
       lineChart.append("g")
         .attr("class", "co2_axis")
-        // .attr("transform", "translate(0,-5)")
         .call(d3.axisLeft(initialco2Scale).tickSizeOuter(0).tickFormat(function (d) { return d + " ppm" }))
-      // .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0));
+        .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0));
 
       lineChart.append("g").lower()
         .attr("class", "y gridlines")
-        // .attr("transform", "translate(-5,0)")
-        .call(d3.axisLeft(initialco2Scale).tickFormat("").tickSize(-lineChartHeight - 10));
+        .call(d3.axisLeft(initialco2Scale).tickFormat("").tickSize(-lineChartWidth));
 
       var tempScale = d3.scaleLinear()
         .domain(d3.extent(tempDataAvgByYear, d => d.temperature))
@@ -517,10 +518,10 @@
       // lineChart.append("circle").attr("cx", 40).attr("cy", 90).attr("r", 6).style("fill", "#FFDA33");
       // lineChart.append("text").attr("x", 60).attr("y", 60).text("CO2 Emission").style("font-size", "15px").attr("alignment-baseline", "middle");
       // lineChart.append("text").attr("x", 60).attr("y", 90).text("Avg Temperature").style("font-size", "15px").attr("alignment-baseline", "middle");
-      lineChart.append("circle").attr("cx", 20).attr("cy", 5).attr("r", 3).style("fill", "#823b0e");
-      lineChart.append("text").attr("x", 40).attr("y", 5).text("CO2 Emission").style("font-size", "12px").attr("alignment-baseline", "middle");
-      lineChart.append("circle").attr("cx", 20).attr("cy", 20).attr("r", 3).style("fill", "#09604c");
-      lineChart.append("text").attr("x", 40).attr("y", 20).text("Avg Temperature").style("font-size", "12px").attr("alignment-baseline", "middle");
+      lineChart.append("circle").attr("cx", 20).attr("cy", 10).attr("r", 3).style("fill", "#823b0e");
+      lineChart.append("text").attr("x", 40).attr("y", 10).text("CO2 Emission").style("font-size", "12px").attr("alignment-baseline", "middle");
+      lineChart.append("circle").attr("cx", 20).attr("cy", 25).attr("r", 3).style("fill", "#09604c");
+      lineChart.append("text").attr("x", 40).attr("y", 25).text("Avg Temperature").style("font-size", "12px").attr("alignment-baseline", "middle");
 
       // End of line chart
 
@@ -626,7 +627,7 @@
       var cScale = t => d3.interpolateRdBu(1 - t)
       var color = d3.scaleLinear().domain([10, 100]).range(["brown", "steelblue"]);
       var colorData = [];
-      for (var i = 0; i <= 34; i++) {
+      for (var i = 0; i < 34; i++) {
         colorData.push(i)
       }
       console.log(colorData)
@@ -724,7 +725,7 @@
           .attr("transform", "translate(0," + (lineChartHeight + 5) + ")")
           .call(d3.axisBottom(d3.scaleTime()
             .domain([DEFAULT_DATE, year])
-            .range([0, lineChartWidth])).ticks(10).tickSizeOuter(0).tickFormat(d3.format("d")))
+            .range([0, lineChartWidth])).ticks(12).tickSizeOuter(0).tickFormat(d3.format("d")))
           .call(g => g.selectAll(".tick line").attr("stroke-opacity", 0.4));
 
         // get the CO2 emission data and draw the bar representing the CO2 emission
@@ -737,7 +738,7 @@
 
         var co2Extent = d3.extent(co2Data, d => d.CO2_concentrations);
         const colorScale2 = d3.scaleSequential(d3.interpolateYlOrBr).domain([co2Extent[0] - 40, co2Extent[1]]); // color changes via the CO2 emission through years
-        const lengthScale = d3.scaleLinear().domain(co2Extent).range([200, 400]); // length changes via the CO2 emission through years
+        const lengthScale = d3.scaleLinear().domain(co2Extent).range([250, 450]); // length changes via the CO2 emission through years
         drawCO2Bar(co2, lengthScale, colorScale2)
 
         var updateco2Data = co2Data.filter(function (d) { return new Date(d.Year) <= new Date(year); });
@@ -819,7 +820,7 @@
         lineChart.append("g").lower()
           .attr("class", "y gridlines")
           // .attr("transform", "translate(-5,0)")
-          .call(d3.axisLeft(updateco2Scale).tickFormat("").tickSize(-lineChartHeight - 10));
+          .call(d3.axisLeft(updateco2Scale).tickFormat("").tickSize(-lineChartWidth));
 
 
 
@@ -924,12 +925,9 @@
         // drawLegend(d3.select("#colorLegend"), colorScale);
 
         // drawLegend(d3.select("#colorLegend"), colorScale);
-      }
+      } // End of update function
 
-
-
-
-      var startDate = new Date("1980-02-01"), endDate = new Date("2012-12-31");
+      var startDate = new Date("1980-01-01"), endDate = new Date("2012-02-01");
 
       var svgSlider = d3.select("#slider")
         .append("svg")
@@ -962,7 +960,7 @@
 
       slider.insert("g", ".track-overlay")
         .attr("class", "ticks")
-        .attr("transform", "translate(0," + 18 + ")")
+        .attr("transform", "translate(0," + 15 + ")")
         .selectAll("text")
         .data(x.ticks(17))
         .enter()
@@ -970,9 +968,7 @@
         .attr("x", x)
         .attr("y", 10)
         .attr("text-anchor", "middle")
-        .text(function (d) {
-          return formatDateIntoYear(d);
-        });
+        .text(d=> formatDateIntoYear(d));
 
       var handle = slider.insert("circle", ".track-overlay")
         .attr("class", "handle")
@@ -981,7 +977,7 @@
       var label = slider.append("text")
         .attr("class", "label")
         .attr("text-anchor", "middle")
-        .text(formatDateIntoYear(startDate))
+        .text(Number(formatDateIntoYear(startDate)) + 1)
         .attr("transform", "translate(0," + (-15) + ")");
 
       d3.select('#winter').on('click', () => {
@@ -1081,9 +1077,8 @@
         // we style this in <head>
         .style("visibility", "hidden")
         .attr("x", 0).attr("y", 0)
-        .attr("rx", 5).attr("ry", 5)  // rx and ry round corners
-        .attr("width", '100%')
-        .attr("height", '80%');  // set width later
+        .attr("transform", "translate(53,0)")
+        .attr("height", '90%');  // set width later
 
       const textbox = tooltip.append("g").attr("transform", "translate(10,10)");
 
@@ -1091,21 +1086,21 @@
         .attr("fill", "black")
         .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
-        .attr("x", 10)
+        .attr("x", 60)
         .attr("y", 10);
 
       let txt2 = tooltip.append("text")
         .attr("fill", "black")
         .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
-        .attr("x", 10)
+        .attr("x", 60)
         .attr("y", 30);
 
       let txt3 = tooltip.append("text")
         .attr("fill", "black")
         .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
-        .attr("x", 10)
+        .attr("x", 60)
         .attr("y", 50);
 
       // mouseover outline
@@ -1130,9 +1125,9 @@
         var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === countryID || b.id === countryID; });
         //  Then apply it to your special mesh that's on top of everything else
         momesh.datum(mo).attr("d", path)
-        txt1.text(countryName + " " + countryID + "\n")
-        txt2.text("Temperature: " + countryTemp[idToCountry[countryID]])
-        txt3.text("History Min/Max: " + d3.extent(countryMinMax[idToCountry[countryID]]))
+        txt1.text(countryName)
+        txt2.text("Temperature: " + countryTemp[idToCountry[countryID]] + "\u2103")
+        txt3.text("History Min/Max: " + "[" + d3.extent(countryMinMax[idToCountry[countryID]])[0] + "\u2103," + d3.extent(countryMinMax[idToCountry[countryID]])[1] + "\u2103" + "]")
         // let bounds = path.bounds(country.datum());   // Get the pixel boundaries of the state
         // // Place it at the bottom of the state, centered
         // let xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
