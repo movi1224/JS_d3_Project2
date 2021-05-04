@@ -193,7 +193,9 @@
 
   <div class="content">
     <div class="column left">
-      <svg class="tool_tip"></svg>
+      <div class="tooltip_box" style="text-align: center;">
+        <svg class="tool_tip"></svg>
+      </div>
       <div id="line_chart" style="text-align: center;"></div>
       <div class="btn-group-horizontal" role="group" id="season-button-group">
         <button type="button" class="btn btn-default" id="winter"><span aria-hidden="true">Jan-Mar</span></button>
@@ -422,7 +424,7 @@
 
       // annotations
       lineChart.append("circle").attr("cx", 20).attr("cy", 10).attr("r", 3).style("fill", "#823b0e");
-      lineChart.append("text").attr("x", 40).attr("y", 10).text("CO2 Emission").style("font-size", "12px").attr("alignment-baseline", "middle");
+      lineChart.append("text").attr("x", 40).attr("y", 10).text("Carbon Dioxide Emission").style("font-size", "12px").attr("alignment-baseline", "middle");
       lineChart.append("circle").attr("cx", 20).attr("cy", 25).attr("r", 3).style("fill", "#09604c");
       lineChart.append("text").attr("x", 40).attr("y", 25).text("Avg Temperature").style("font-size", "12px").attr("alignment-baseline", "middle");
       // End of line chart
@@ -905,21 +907,24 @@
         .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
         .attr("x", 60)
-        .attr("y", 10);
+        .attr("y", 10)
+        .text("Country: ");
 
       let txt2 = textbox.append("text")
         .attr("fill", "black")
         .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
         .attr("x", 60)
-        .attr("y", 30);
+        .attr("y", 30)
+        .text("Temperature: ");
 
       let txt3 = textbox.append("text")
         .attr("fill", "black")
         .attr("text-anchor", "left")
         .attr("alignment-baseline", "hanging")
         .attr("x", 60)
-        .attr("y", 50);
+        .attr("y", 50)
+        .text("History Min/Max: ");
 
       // mouseover outline
       let momesh = map.append("path")
@@ -943,7 +948,7 @@
         var mo = topojson.mesh(world, world.objects.countries, function (a, b) { return a.id === countryID || b.id === countryID; });
         //  Then apply it to your special mesh that's on top of everything else
         momesh.datum(mo).attr("d", path)
-        txt1.text(countryName)
+        txt1.text("Country: " + countryName)
         txt2.text("Temperature: " + countryTemp[idToCountry[countryID]] + "\u2103")
         txt3.text("History Min/Max: " + "[" + d3.extent(countryTempList[idToCountry[countryID]])[0] + "\u2103," + d3.extent(countryTempList[idToCountry[countryID]])[1] + "\u2103" + "]")
 
@@ -973,7 +978,7 @@
         .attr("x", "5")
         .attr("y", "18")
         .attr("fill", 'white')
-        .text("CO2 Concentration: " + data + "ppm")
+        .text("Carbon Dioxide Emission: " + data + "ppm")
     }
     // Function needs a d3 selected SVG canvas where it will draw the legend and a source color scale
     function drawLegend(legend, legendColorScale, weatherView) {
